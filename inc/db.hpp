@@ -6,15 +6,19 @@
 #include <vector>
 
 namespace memdb {
+
 enum col_type { bool_type, int32, string, bytes };
+
 enum instruction_type {
-  UPDATE,
+  SELECT,
+  WHERE,
   INSERT,
-  DELETE,
+  UPDATE,
   CREATE,
-  JOIN,
-  CALCULATE,
+  DELETE,
+
 };
+
 class instruction {
 private:
   instruction_type type;
@@ -23,6 +27,7 @@ private:
   // compatible types)
 public:
 };
+
 class item {
   std::vector<cell::Cell> row;
 
@@ -31,6 +36,15 @@ public:
   // TODO: create helpful methods
 };
 
+// TODO: Create iterator for result class
+class result {
+  // WARN: I'm unsure if it's good idea to have vector of cells as a result
+  std::vector<item> result;
+
+  bool is_ok();
+};
+
+// NOTE: main class in db.hpp
 class db {
   class table {
     std::vector<item> rows;
@@ -38,7 +52,7 @@ class db {
   };
 
 public:
-  void execute(std::string_view query);
+  result execute(std::string_view query);
   std::unordered_map<std::string_view, table> tables;
 };
 } // namespace memdb

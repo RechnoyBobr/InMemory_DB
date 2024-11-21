@@ -1,27 +1,31 @@
+#pragma once
+
 #include "cell.hpp"
-#include <concepts>
-#include <string>
-#include <type_traits>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace memdb {
 enum col_type { bool_type, int32, string, bytes };
+class instruction {
+private:
+};
+class item {
+  std::vector<cell::Cell> row;
+
+public:
+  item(std::vector<cell::Cell> r);
+  // TODO: create helpful methods
+};
+
 class db {
   class table {
-    // Some array of cells goes here
-    std::vector<std::string> cols;
-    class item {
-    private:
-      std::vector<cell::Cell> row;
-      std::vector<std::string> row_names;
-      std::vector<col_type> types;
-
-    public:
-      item(std::vector<cell::Cell> r);
-    };
+    std::vector<item> rows;
+    std::vector<std::pair<std::string_view, col_type>> cols;
   };
 
-  void execute(std::string query);
-  std::vector<table> tables;
+public:
+  void execute(std::string_view query);
+  std::unordered_map<std::string_view, table> tables;
 };
 } // namespace memdb

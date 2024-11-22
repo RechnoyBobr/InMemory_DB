@@ -1,4 +1,5 @@
 #include "../inc/lexer.hpp"
+
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
@@ -32,4 +33,4 @@ lexer::tokenize(std::string_view query) {
   }
   return result;
 }
-} // namespace basic_lexer
+}  // namespace basic_lexer

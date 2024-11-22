@@ -1,12 +1,13 @@
-#include "db.hpp"
 #include <string_view>
+
+#include "db.hpp"
 
 namespace basic_lexer {
 // NOTE: lexer should tokenize query string
 // and return vector of tokens to parser for further
 // processing
 class lexer {
-private:
+ private:
   enum waiting_state { KEYWORD, COMMAND };
 
   std::unordered_map<std::string_view, memdb::instruction_type> converter = {
@@ -22,9 +23,10 @@ private:
 
   };
 
-public:
-  std::vector<std::pair<memdb::instruction_type, std::string_view>>
-  tokenize(std::string_view query);
+ public:
+  lexer() = default;
+  std::vector<std::pair<memdb::instruction_type, std::string_view>> tokenize(
+      std::string_view query);
 };
 
-} // namespace basic_lexer
+}  // namespace basic_lexer

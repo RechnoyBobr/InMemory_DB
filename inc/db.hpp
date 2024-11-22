@@ -1,9 +1,11 @@
 #pragma once
 
-#include "cell.hpp"
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+#include "cell.hpp"
+#include "operator.hpp"
 
 namespace memdb {
 
@@ -16,22 +18,26 @@ enum instruction_type {
   UPDATE,
   CREATE,
   DELETE,
-
+  FROM,
+  TO,
+  SET
 };
 
 class instruction {
-private:
+ private:
   instruction_type type;
   std::vector<cell::Cell> operands;
+  std::vector<op::instruction_operator> operators;
   // TODO: imagine a way to represent operators. (they should be overloaded for
   // compatible types)
-public:
+ public:
+  cell::Cell evaluate();
 };
 
 class item {
   std::vector<cell::Cell> row;
 
-public:
+ public:
   item(std::vector<cell::Cell> r);
   // TODO: create helpful methods
 };
@@ -51,8 +57,8 @@ class db {
     std::vector<std::pair<std::string_view, col_type>> cols;
   };
 
-public:
+ public:
   result execute(std::string_view query);
   std::unordered_map<std::string_view, table> tables;
 };
-} // namespace memdb
+}  // namespace memdb

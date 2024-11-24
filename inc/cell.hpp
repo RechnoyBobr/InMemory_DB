@@ -7,15 +7,15 @@
 
 namespace cell {
 class Cell {
-private:
+ private:
   std::variant<std::string_view, bool, int, std::vector<std::byte>> value;
+  bool is_empty = false;
 
-public:
-  Cell() = default;
-  Cell(std::string_view &str);
+ public:
+  Cell();
+  Cell(std::string str);
   Cell(int i);
   Cell(bool i);
-  Cell(std::string x);
   Cell(std::vector<std::byte> &bytes);
   // NOTE: if called a function of type different than actual value, an
   // exception should be thrown
@@ -24,4 +24,4 @@ public:
   int get_int();
   std::vector<std::byte> get_bytes();
 };
-} // namespace cell
+}  // namespace cell

@@ -1,0 +1,3 @@
+/home/ilya/InMemory_DB/CMakeFiles/CMakeScratch/TryCompile-S4OuQ2/CMakeFiles/cmTC_222eb.dir
+/home/ilya/InMemory_DB/CMakeFiles/CMakeScratch/TryCompile-S4OuQ2/CMakeFiles/edit_cache.dir
+/home/ilya/InMemory_DB/CMakeFiles/CMakeScratch/TryCompile-S4OuQ2/CMakeFiles/rebuild_cache.dir

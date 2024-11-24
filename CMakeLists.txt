@@ -17,7 +17,10 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(lexer_tests test/lexer_test.cpp)
+add_executable(parser_tests test/parser_test.cpp)
 target_link_libraries(lexer_tests GTest::gtest_main InMemory_DB)
+target_link_libraries(parser_tests GTest::gtest_main InMemory_DB)
 
 include(GoogleTest)
 gtest_discover_tests(lexer_tests)
+gtest_discover_tests(parser_tests)

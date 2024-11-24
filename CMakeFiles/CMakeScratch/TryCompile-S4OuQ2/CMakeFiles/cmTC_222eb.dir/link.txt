@@ -1,0 +1,1 @@
+/usr/sbin/cc  -v -Wl,-v CMakeFiles/cmTC_222eb.dir/CMakeCCompilerABI.c.o -o cmTC_222eb

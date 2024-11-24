@@ -1,6 +1,8 @@
 #include "../inc/db.hpp"
-#include "../inc/query_parser.hpp"
+
 #include <string_view>
+
+#include "../inc/query_parser.hpp"
 
 namespace memdb {
 // result db::execute(std::string_view query) {
@@ -15,4 +17,12 @@ namespace memdb {
 //
 //   return last_result;
 // }
-} // namespace memdb
+//
+instruction::instruction(std::vector<cell::Cell> ops,
+                         std::vector<op::instruction_operator> op,
+                         instruction_type type) {
+  this->operands = ops;
+  this->operators = op;
+  this->type = type;
+}
+}  // namespace memdb

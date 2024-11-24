@@ -1,3 +1,4 @@
+#pragma once
 #include <string_view>
 
 #include "db.hpp"
@@ -25,7 +26,7 @@ class lexer {
 
  public:
   lexer() = default;
-  std::vector<std::pair<memdb::instruction_type, std::string_view>> tokenize(
+  std::vector<std::pair<memdb::instruction_type, std::string>> tokenize(
       std::string_view query);
 };
 

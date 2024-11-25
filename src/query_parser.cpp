@@ -141,6 +141,8 @@ std::vector<memdb::instruction> query_parser::parse(std::string_view query) {
           }
           ind++;
         }
+        memdb::instruction table_create = memdb::instruction(col_names, types);
+        result.emplace_back(table_create);
         break;
       }
       default:
@@ -148,6 +150,7 @@ std::vector<memdb::instruction> query_parser::parse(std::string_view query) {
             "There was an error during the lexing process");
     }
   }
+  return result;
 }
 memdb::col_type query_parser::parse_type(std::string_view input) {
   if (input == "int32") {

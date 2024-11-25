@@ -33,19 +33,28 @@ class instruction {
  private:
   instruction_type type;
   std::vector<cell::Cell> operands;
-  // Vector of columns names if type is create table
-  std::vector<std::string> names;
   // NOTE: is it important?
   std::vector<op::instruction_operator> operators;
-  // If type is create table then we should keep vectors of columns names and
-  // types
+  // If type is create table
+  std::vector<std::pair<std::string, std::vector<attributes>>> col_names;
+  std::vector<std::pair<col_type, cell::Cell>> col_types;
+  std::string table_name;
+
  public:
   instruction() = default;
 
   instruction(std::vector<cell::Cell> ops,
               std::vector<op::instruction_operator> op, instruction_type type);
-
-  cell::Cell evaluate();
+  instruction(
+      std::string table_name,
+      std::vector<std::pair<std::string, std::vector<attributes>>> names,
+      std::vector<std::pair<col_type, cell::Cell>> types);
+  instruction_type get_type();
+  // Can throw runtime error if type not create
+  std::vector<std::pair<std::string, std::vector<attributes>>>
+  get_columns_names();
+  std::vector<std::pair<col_type, cell::Cell>> get_columns_types();
+  std::string get_table_name();
 };
 
 class item {
@@ -59,17 +68,36 @@ class item {
 // TODO: Create iterator for result class
 class result {
   // WARN: I'm unsure if it's good idea to have vector of cells as a result
-  std::vector<item> result;
+ private:
+  std::vector<item> queried_cols;
+  bool is_ok;
+  bool is_empty;
 
-  bool is_ok();
+ public:
+  result();
+  result(std::vector<item>);
+};
+
+class header {
+ private:
+  std::vector<std::pair<std::string, std::vector<attributes>>> col_names;
+  std::vector<std::pair<col_type, cell::Cell>> col_types;
+
+ public:
+  header(std::vector<std::pair<std::string, std::vector<attributes>>> names,
+         std::vector<std::pair<col_type, cell::Cell>> types);
 };
 
 // NOTE: main class in db.hpp
 class db {
   class table {
+   private:
     std::vector<item> rows;
-    std::vector<std::pair<std::string_view, std::pair<col_type, attributes>>>
-        cols;
+    header cols;
+    int row_size;
+
+   public:
+    table(header cols);
   };
 
  public:

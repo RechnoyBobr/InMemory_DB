@@ -29,10 +29,12 @@ namespace basic_parser {
             TABLE_NAME,
         };
 
-        memdb::col_type parse_type(std::string_view input);
+        static memdb::col_type parse_type(std::string &input);
 
         // TODO: It should return array of instructions to run
     public:
+        cell::Cell get_cell(std::string &str, memdb::col_type cur_type);
+
         std::vector<memdb::instruction> parse(std::string_view query);
     };
 } // namespace basic_parser

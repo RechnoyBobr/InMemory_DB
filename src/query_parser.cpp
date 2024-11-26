@@ -9,6 +9,59 @@
 #include "../inc/lexer.hpp"
 
 namespace basic_parser {
+    cell::Cell query_parser::get_cell(std::string &tmp, memdb::col_type cur_type) {
+        cell::Cell ret_value;
+        switch (cur_type) {
+            case memdb::col_type::bytes: {
+                std::vector<std::byte> res = {};
+                bool flag = false;
+                int cnt_ch = 0;
+                int cur_byte = 0;
+                for (char ch: tmp) {
+                    if (flag) {
+                        cur_byte <<= 4;
+                        std::string char_str;
+                        char_str += ch;
+                        cur_byte += std::stoi(char_str, nullptr, 16);
+                        cnt_ch++;
+                    }
+                    if (ch == 'x') {
+                        flag = true;
+                    }
+                    if (cnt_ch == 2) {
+                        res.emplace_back(std::byte(cur_byte));
+                        cur_byte = 0;
+                        cnt_ch = 0;
+                    }
+                }
+                if (tmp.size() % 2 != 0) {
+                    res.emplace_back(std::byte(cur_byte));
+                }
+                ret_value = cell::Cell(res);
+                break;
+            }
+            case memdb::col_type::string: {
+                // trim the quotes
+                std::string trimmed_str = tmp.substr(1, tmp.size() - 2);
+                ret_value = cell::Cell(trimmed_str);
+                break;
+            }
+            case memdb::col_type::int32: {
+                ret_value = cell::Cell(std::stoi(tmp));
+                break;
+            }
+            case memdb::col_type::bool_type: {
+                if (tmp == "true") {
+                    ret_value = cell::Cell(true);
+                } else if (tmp == "false") {
+                    ret_value = cell::Cell(false);
+                } else {
+                    throw std::runtime_error("Can't recognize default value");
+                }
+            }
+        }
+    }
+
     std::vector<memdb::instruction> query_parser::parse(std::string_view query) {
         basic_lexer::lexer l = basic_lexer::lexer();
         auto lexed_commands = l.tokenize(query);
@@ -68,63 +121,15 @@ namespace basic_parser {
                         } else if (params[ind] == ',' || params[ind] == ')') {
                             if (cur_state == VAR_TYPE) {
                                 // if there is no default value
-                                cur_type = parse_type(tmp);
-                                types.emplace_back(cur_type, cell::Cell());
+
+                                types.emplace_back(parse_type(tmp), cell::Cell());
                                 tmp = "";
                             } else if (cur_state == DEF_VAL) {
                                 if (tmp.empty()) {
                                     default_val = cell::Cell();
                                 } else {
-                                    switch (cur_type) {
-                                        case memdb::col_type::bytes: {
-                                            std::vector<std::byte> res = {};
-                                            bool flag = false;
-                                            int cnt_ch = 0;
-                                            int cur_byte = 0;
-                                            for (char ch: tmp) {
-                                                if (flag) {
-                                                    cur_byte <<= 4;
-                                                    std::string char_str;
-                                                    char_str += ch;
-                                                    cur_byte += std::stoi(char_str, nullptr, 16);
-                                                    cnt_ch++;
-                                                }
-                                                if (ch == 'x') {
-                                                    flag = true;
-                                                }
-                                                if (cnt_ch == 2) {
-                                                    res.emplace_back(std::byte(cur_byte));
-                                                    cur_byte = 0;
-                                                    cnt_ch = 0;
-                                                }
-                                            }
-                                            if (tmp.size() % 2 != 0) {
-                                                res.emplace_back(std::byte(cur_byte));
-                                            }
-                                            default_val = cell::Cell(res);
-                                            break;
-                                        }
-                                        case memdb::col_type::string: {
-                                            // trim the quotes
-                                            std::string trimmed_str = tmp.substr(1, tmp.size() - 2);
-                                            default_val = cell::Cell(trimmed_str);
-                                            break;
-                                        }
-                                        case memdb::col_type::int32: {
-                                            default_val = cell::Cell(std::stoi(tmp));
-                                            break;
-                                        }
-                                        case memdb::col_type::bool_type: {
-                                            if (tmp == "true") {
-                                                default_val = cell::Cell(true);
-                                            } else if (tmp == "false") {
-                                                default_val = cell::Cell(false);
-                                            } else {
-                                                throw std::runtime_error("Can't recognize default value");
-                                            }
-                                            break;
-                                        }
-                                    }
+                                    default_val = get_cell(tmp, cur_type);
+                                    break;
                                 }
                                 types.emplace_back(cur_type, default_val);
                                 tmp = "";
@@ -142,7 +147,51 @@ namespace basic_parser {
                 }
 
                 case memdb::INSERT: {
-
+                    int ind = 0;
+                    std::string tmp;
+                    std::unordered_map<std::string, cell::Cell> values_by_name;
+                    std::vector<cell::Cell> values_by_order;
+                    std::string column_name;
+                    memdb::instruction insert_c;
+                    int insert_type = 1;
+                    while (ind < query.size()) {
+                        if (query[ind] == '=') {
+                            //Then we should save column name
+                            column_name = tmp;
+                            tmp = "";
+                        }
+                        if (query[ind] == ')' || query[ind] == ',') {
+                            memdb::col_type cur_type;
+                            if (tmp.contains('\"')) {
+                                cur_type = memdb::col_type::string;
+                            } else if (tmp.contains('x')) {
+                                cur_type = memdb::col_type::bytes;
+                            } else if (std::isalpha(tmp[0])) {
+                                cur_type = memdb::col_type::bool_type;
+                            } else {
+                                cur_type = memdb::col_type::int32;
+                            }
+                            cell::Cell c;
+                            if (!tmp.empty()) {
+                                c = get_cell(tmp, cur_type);
+                            }
+                            if (column_name.empty()) {
+                                // Then pass the values vector
+                                values_by_order.emplace_back(c);
+                            } else {
+                                insert_type = 2;
+                                values_by_name[column_name] = c;
+                            }
+                        } else if (query[ind] != ' ') {
+                            tmp += query[ind];
+                        }
+                        ind++;
+                    }
+                    if (insert_type == 1) {
+                        result.emplace_back(values_by_order);
+                    } else {
+                        result.emplace_back(values_by_name);
+                    }
                     break;
                 }
 
@@ -153,7 +202,7 @@ namespace basic_parser {
         return result;
     }
 
-    memdb::col_type query_parser::parse_type(std::string_view input) {
+    memdb::col_type query_parser::parse_type(std::string &input) {
         if (input == "int32") {
             return memdb::col_type::int32;
         } else if (input == "bool") {

@@ -26,22 +26,31 @@ namespace memdb {
         DELETE,
         FROM,
         TO,
-        SET
+        SET,
+        ERROR
     };
 
     class instruction {
-    private:
         instruction_type type;
+
+        // If type WHERE
         std::vector<cell::Cell> operands;
-        // NOTE: is it important?
         std::vector<op::instruction_operator> operators;
         // If type is create table
         std::vector<std::pair<std::string, std::vector<attributes> > > col_names;
         std::vector<std::pair<col_type, cell::Cell> > col_types;
         std::string table_name;
+        // If type is insert
+        std::vector<cell::Cell> values_ordered;
+        std::unordered_map<std::string, cell::Cell> values_by_name;
+        int insert_type;
 
     public:
         instruction() = default;
+
+        instruction(std::vector<cell::Cell> v);
+
+        instruction(std::unordered_map<std::string, cell::Cell> v);
 
         instruction(std::vector<cell::Cell> ops,
                     std::vector<op::instruction_operator> op, instruction_type type);
@@ -51,15 +60,15 @@ namespace memdb {
             std::vector<std::pair<std::string, std::vector<attributes> > > names,
             std::vector<std::pair<col_type, cell::Cell> > types);
 
-        instruction_type get_type();
+        instruction_type get_type() const;
 
         // Can throw runtime error if type not create
         std::vector<std::pair<std::string, std::vector<attributes> > >
-        get_columns_names();
+        &get_columns_names();
 
-        std::vector<std::pair<col_type, cell::Cell> > get_columns_types();
+        std::vector<std::pair<col_type, cell::Cell> > &get_columns_types();
 
-        std::string get_table_name();
+        std::string &get_table_name();
     };
 
     class item {
@@ -88,11 +97,11 @@ namespace memdb {
         result(std::vector<item> queried_items);
 
         // If there was an error
-        result(std::string_view msg);
+        result(std::string msg);
 
-        std::string_view get_error();
+        std::string &get_error();
 
-        bool is_ok();
+        bool is_ok() const;
     };
 
     class header {
@@ -129,6 +138,6 @@ namespace memdb {
     public:
         result execute(std::string_view query);
 
-        std::string &debug_get_table_ith_col_name(std::string name, int i);
+        std::string &debug_get_table_ith_col_name(const std::string& name, int i);
     };
 } // namespace memdb

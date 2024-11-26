@@ -19,6 +19,9 @@ namespace memdb {
                         ret_val = result(i.get_type());
                         break;
                     }
+                    case INSERT: {
+                        if (i.)
+                    }
                     default: {
                         throw std::runtime_error("Unsupported");
                     }
@@ -30,11 +33,24 @@ namespace memdb {
         return ret_val;
     }
 
+    instruction::instruction(std::unordered_map<std::string, cell::Cell> v) {
+        values_by_name = std::move(v);
+        type = INSERT;
+        insert_type = 2;
+    }
+
+    instruction::instruction(std::vector<cell::Cell> v) {
+        values_ordered = std::move(v);
+        type = INSERT;
+        insert_type = 2;
+    }
+
+
     instruction::instruction(std::vector<cell::Cell> ops,
                              std::vector<op::instruction_operator> op,
                              instruction_type type) {
-        this->operands = ops;
-        this->operators = op;
+        this->operands = std::move(ops);
+        this->operators = std::move(op);
         this->type = type;
     }
 
@@ -49,37 +65,38 @@ namespace memdb {
         this->type = CREATE;
     }
 
-    std::vector<std::pair<std::string, std::vector<attributes> > >
-    instruction::get_columns_names() {
+    std::vector<std::pair<std::string, std::vector<attributes>>> &instruction::get_columns_names() {
         return col_names;
     }
 
-    std::vector<std::pair<col_type, cell::Cell> > instruction::get_columns_types() {
+    std::vector<std::pair<col_type, cell::Cell>> &instruction::get_columns_types() {
         return col_types;
     }
 
-    instruction_type instruction::get_type() { return type; }
+    instruction_type instruction::get_type() const { return type; }
 
-    std::string instruction::get_table_name() { return table_name; }
+    std::string &instruction::get_table_name() { return table_name; }
 
     result::result(instruction_type t) {
         type = t;
     }
 
-    result::result(std::string_view msg) {
+    result::result(std::string msg) {
+        type = ERROR;
         valid = false;
-        this->error_msg = msg;
+        this->error_msg = std::move(msg);
     }
 
-    bool result::is_ok() { return valid; }
+    bool result::is_ok() const { return valid; }
 
     // WARN: it'd be impossible to iterate over cols without knowing of their type
     // or atleast I think so. (Find some better way to do so)
     result::result(std::vector<item> queried_items) {
-        this->queried_cols = queried_items;
+        this->queried_cols = std::move(queried_items);
+        type = SELECT;
     }
 
-    std::string_view result::get_error() { return error_msg; }
+    std::string &result::get_error() { return error_msg; }
 
     header::header(
         std::vector<std::pair<std::string, std::vector<attributes> > > names,
@@ -97,7 +114,7 @@ namespace memdb {
         return cols.get_columns_names()[i].first;
     }
 
-    std::string &db::debug_get_table_ith_col_name(std::string name, int i) {
+    std::string &db::debug_get_table_ith_col_name(const std::string& name, int i) {
         return tables[name]->get_ith_col_name(i);
     }
 } // namespace memdb

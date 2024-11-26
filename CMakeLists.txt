@@ -18,6 +18,8 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(lexer_tests test/lexer_test.cpp)
 add_executable(parser_tests test/parser_test.cpp)
+add_executable(example src/main.cpp)
+target_link_libraries(example InMemory_DB)
 target_link_libraries(lexer_tests GTest::gtest_main InMemory_DB)
 target_link_libraries(parser_tests GTest::gtest_main InMemory_DB)
 

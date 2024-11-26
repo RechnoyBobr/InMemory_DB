@@ -29,8 +29,9 @@ enum instruction_type {
   TO,
   SET
 };
+
 class instruction {
- private:
+private:
   instruction_type type;
   std::vector<cell::Cell> operands;
   // NOTE: is it important?
@@ -40,7 +41,7 @@ class instruction {
   std::vector<std::pair<col_type, cell::Cell>> col_types;
   std::string table_name;
 
- public:
+public:
   instruction() = default;
 
   instruction(std::vector<cell::Cell> ops,
@@ -58,51 +59,59 @@ class instruction {
 };
 
 class item {
+private:
   std::vector<cell::Cell> row;
 
- public:
+public:
   item(std::vector<cell::Cell> r);
   // TODO: create helpful methods
 };
 
 // TODO: Create iterator for result class
 class result {
-  // WARN: I'm unsure if it's good idea to have vector of cells as a result
- private:
+private:
   std::vector<item> queried_cols;
-  bool is_ok;
-  bool is_empty;
+  bool valid = true;
+  instruction_type type;
+  std::string_view error_msg;
 
- public:
-  result();
-  result(std::vector<item>);
+public:
+  result() = default;
+  result(std::vector<item> queried_items);
+  // If there was an error
+  result(std::string_view msg);
+  std::string_view get_error();
+  bool is_ok();
 };
 
 class header {
- private:
+private:
   std::vector<std::pair<std::string, std::vector<attributes>>> col_names;
   std::vector<std::pair<col_type, cell::Cell>> col_types;
 
- public:
+public:
+  header() = default;
   header(std::vector<std::pair<std::string, std::vector<attributes>>> names,
          std::vector<std::pair<col_type, cell::Cell>> types);
+  auto get_columns_names();
+  auto get_columns_types();
 };
 
-// NOTE: main class in db.hpp
+class table {
+private:
+  std::vector<item> rows;
+  header cols;
+  int row_size;
+
+public:
+  auto get_ith_col_name(int i);
+  table(header h);
+};
+
 class db {
-  class table {
-   private:
-    std::vector<item> rows;
-    header cols;
-    int row_size;
-
-   public:
-    table(header cols);
-  };
-
- public:
+public:
   result execute(std::string_view query);
   std::unordered_map<std::string_view, std::unique_ptr<table>> tables;
-  void create_table();
+  std::string debug_get_table_ith_col_name(std::string name, int i);
 };
-}  // namespace memdb
+} // namespace memdb

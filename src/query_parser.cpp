@@ -9,10 +9,10 @@
 #include "../inc/lexer.hpp"
 
 namespace basic_parser {
-    cell::Cell query_parser::get_cell(std::string &tmp, memdb::col_type cur_type) {
+    cell::Cell query_parser::get_cell(std::string &tmp, cell::col_type cur_type) {
         cell::Cell ret_value;
         switch (cur_type) {
-            case memdb::col_type::bytes: {
+            case cell::col_type::BYTES: {
                 std::vector<std::byte> res = {};
                 bool flag = false;
                 int cnt_ch = 0;
@@ -40,17 +40,17 @@ namespace basic_parser {
                 ret_value = cell::Cell(res);
                 break;
             }
-            case memdb::col_type::string: {
+            case cell::col_type::STRING: {
                 // trim the quotes
                 std::string trimmed_str = tmp.substr(1, tmp.size() - 2);
                 ret_value = cell::Cell(trimmed_str);
                 break;
             }
-            case memdb::col_type::int32: {
+            case cell::col_type::INT32: {
                 ret_value = cell::Cell(std::stoi(tmp));
                 break;
             }
-            case memdb::col_type::bool_type: {
+            case cell::col_type::BOOL: {
                 if (tmp == "true") {
                     ret_value = cell::Cell(true);
                 } else if (tmp == "false") {
@@ -59,31 +59,38 @@ namespace basic_parser {
                     throw std::runtime_error("Can't recognize default value");
                 }
             }
+            case cell::col_type::EMPTY: {
+                return {};
+            }
+            default: {
+                throw std::runtime_error("There is no such type. The error is bogus\n");
+            }
         }
+        return ret_value;
     }
 
-    std::vector<memdb::instruction> query_parser::parse(std::string_view query) {
+    std::vector<ins::instruction> query_parser::parse(std::string_view query) {
         basic_lexer::lexer l = basic_lexer::lexer();
         auto lexed_commands = l.tokenize(query);
         // TODO: there is quite a large mess.
         // the comma are only met in attributes or different cols
-        std::vector<memdb::instruction> result = std::vector<memdb::instruction>(0);
+        std::vector<ins::instruction> result = std::vector<ins::instruction>(0);
         parser_state cur_state = TABLE_NAME;
         for (const auto &pair: lexed_commands) {
-            memdb::instruction_type type = pair.first;
+            ins::instruction_type type = pair.first;
             std::string params = pair.second;
             switch (type) {
-                case memdb::CREATE: {
+                case ins::instruction_type::CREATE: {
                     size_t ind = 0;
                     auto col_names =
-                            std::vector<std::pair<std::string, std::vector<memdb::attributes> > >(
+                            std::vector<std::pair<std::string, std::vector<ins::attributes> > >(
                                 0);
                     std::string table_name;
-                    std::vector<std::pair<memdb::col_type, cell::Cell> > types = {};
+                    std::vector<std::pair<cell::col_type, cell::Cell> > types = {};
                     std::string tmp;
-                    std::vector<memdb::attributes> attr;
+                    std::vector<ins::attributes> attr;
                     cell::Cell default_val;
-                    memdb::col_type cur_type;
+                    cell::col_type cur_type;
 
                     while (ind < params.size()) {
                         if (params[ind] == '(') {
@@ -104,11 +111,11 @@ namespace basic_parser {
                         } else if ((params[ind] == ',' || params[ind] == '}') &&
                                    cur_state == ATTRIBUTES) {
                             if (tmp == "key") {
-                                attr.emplace_back(memdb::attributes::KEY);
+                                attr.emplace_back(ins::attributes::KEY);
                             } else if (tmp == "autoincrement") {
-                                attr.emplace_back(memdb::attributes::AUTOINCREMENT);
+                                attr.emplace_back(ins::attributes::AUTOINCREMENT);
                             } else if (tmp == "unique") {
-                                attr.emplace_back(memdb::attributes::UNIQUE);
+                                attr.emplace_back(ins::attributes::UNIQUE);
                             } else {
                                 throw std::runtime_error("Can't recognize the attribute");
                             }
@@ -129,7 +136,6 @@ namespace basic_parser {
                                     default_val = cell::Cell();
                                 } else {
                                     default_val = get_cell(tmp, cur_type);
-                                    break;
                                 }
                                 types.emplace_back(cur_type, default_val);
                                 tmp = "";
@@ -140,36 +146,38 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    memdb::instruction table_create =
-                            memdb::instruction(table_name, col_names, types);
+                    ins::instruction table_create =
+                            ins::instruction(table_name, col_names, types);
                     result.emplace_back(table_create);
                     break;
                 }
 
-                case memdb::INSERT: {
+                case ins::instruction_type::INSERT: {
                     int ind = 0;
                     std::string tmp;
                     std::unordered_map<std::string, cell::Cell> values_by_name;
                     std::vector<cell::Cell> values_by_order;
                     std::string column_name;
-                    memdb::instruction insert_c;
+                    ins::instruction insert_c;
                     int insert_type = 1;
-                    while (ind < query.size()) {
-                        if (query[ind] == '=') {
+                    while (ind < params.size()) {
+                        if (params[ind] == '=') {
                             //Then we should save column name
                             column_name = tmp;
                             tmp = "";
                         }
-                        if (query[ind] == ')' || query[ind] == ',') {
-                            memdb::col_type cur_type;
+                        if (params[ind] == ')' || params[ind] == ',') {
+                            cell::col_type cur_type;
                             if (tmp.contains('\"')) {
-                                cur_type = memdb::col_type::string;
+                                cur_type = cell::col_type::STRING;
                             } else if (tmp.contains('x')) {
-                                cur_type = memdb::col_type::bytes;
+                                cur_type = cell::col_type::BYTES;
                             } else if (std::isalpha(tmp[0])) {
-                                cur_type = memdb::col_type::bool_type;
+                                cur_type = cell::col_type::BOOL;
+                            } else if (tmp[0] == '-' || tmp[0] == '+' || std::isdigit(tmp[0])) {
+                                cur_type = cell::col_type::INT32;
                             } else {
-                                cur_type = memdb::col_type::int32;
+                                cur_type = cell::col_type::EMPTY;
                             }
                             cell::Cell c;
                             if (!tmp.empty()) {
@@ -182,8 +190,8 @@ namespace basic_parser {
                                 insert_type = 2;
                                 values_by_name[column_name] = c;
                             }
-                        } else if (query[ind] != ' ') {
-                            tmp += query[ind];
+                        } else if (params[ind] != ' ') {
+                            tmp += params[ind];
                         }
                         ind++;
                     }
@@ -194,6 +202,18 @@ namespace basic_parser {
                     }
                     break;
                 }
+                case ins::TO: {
+                    int ind = 0;
+                    std::string table_to;
+                    while (ind < params.size()) {
+                        if (params[ind] != ' ') {
+                            table_to += params[ind];
+                        }
+                        ind++;
+                    }
+                    result.emplace_back(ins::instruction(table_to, ins::TO));
+                    break;
+                }
 
                 default:
                     throw std::runtime_error("There was an error during the lexing process");
@@ -202,24 +222,24 @@ namespace basic_parser {
         return result;
     }
 
-    memdb::col_type query_parser::parse_type(std::string &input) {
+    cell::col_type query_parser::parse_type(std::string &input) {
         if (input == "int32") {
-            return memdb::col_type::int32;
+            return cell::col_type::INT32;
         } else if (input == "bool") {
-            return memdb::col_type::bool_type;
+            return cell::col_type::BOOL;
         } else if (input.contains("string")) {
-            return memdb::col_type::string;
+            return cell::col_type::STRING;
         } else if (input.contains("byte")) {
-            return memdb::col_type::bytes;
+            return cell::col_type::BYTES;
         } else {
             throw std::runtime_error("can't recognize column type");
         }
     }
 
-    std::shared_ptr<std::vector<memdb::instruction> >
+    std::shared_ptr<std::vector<ins::instruction> >
     query_parser::math_engine::parse(std::string_view expression) {
-        std::shared_ptr<std::vector<memdb::instruction> > result;
-        memdb::instruction tmp;
+        std::shared_ptr<std::vector<ins::instruction> > result;
+        ins::instruction tmp;
         int ind = 0;
         int subexpression_start = 0;
         state current_state = START;

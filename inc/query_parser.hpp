@@ -1,9 +1,9 @@
 #pragma once
 #include <memory>
 #include <string_view>
-#include <unordered_map>
+#include "cell.hpp"
+#include "instruction.hpp"
 
-#include "db.hpp"
 
 namespace basic_parser {
     class query_parser {
@@ -17,8 +17,7 @@ namespace basic_parser {
 
         public:
             // Returns the result of calculated expression
-            std::shared_ptr<std::vector<memdb::instruction> > parse(
-                std::string_view expression);
+            std::shared_ptr<std::vector<ins::instruction>> parse(std::string_view expression);
         };
 
         enum parser_state {
@@ -29,12 +28,12 @@ namespace basic_parser {
             TABLE_NAME,
         };
 
-        static memdb::col_type parse_type(std::string &input);
+        static cell::col_type parse_type(std::string &input);
 
         // TODO: It should return array of instructions to run
     public:
-        cell::Cell get_cell(std::string &str, memdb::col_type cur_type);
+        cell::Cell get_cell(std::string &str, cell::col_type cur_type);
 
-        std::vector<memdb::instruction> parse(std::string_view query);
+        std::vector<ins::instruction> parse(std::string_view query);
     };
 } // namespace basic_parser

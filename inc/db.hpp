@@ -4,97 +4,29 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include "instruction.hpp"
+
 
 #include "cell.hpp"
-#include "operator.hpp"
 
 namespace memdb {
-    enum col_type { bool_type, int32, string, bytes };
-
-    enum attributes {
-        KEY,
-        AUTOINCREMENT,
-        UNIQUE,
-    };
-
-    enum instruction_type {
-        SELECT,
-        WHERE,
-        INSERT,
-        UPDATE,
-        CREATE,
-        DELETE,
-        FROM,
-        TO,
-        SET,
-        ERROR
-    };
-
-    class instruction {
-        instruction_type type;
-
-        // If type WHERE
-        std::vector<cell::Cell> operands;
-        std::vector<op::instruction_operator> operators;
-        // If type is create table
-        std::vector<std::pair<std::string, std::vector<attributes> > > col_names;
-        std::vector<std::pair<col_type, cell::Cell> > col_types;
-        std::string table_name;
-        // If type is insert
-        std::vector<cell::Cell> values_ordered;
-        std::unordered_map<std::string, cell::Cell> values_by_name;
-        int insert_type;
-
-    public:
-        instruction() = default;
-
-        instruction(std::vector<cell::Cell> v);
-
-        instruction(std::unordered_map<std::string, cell::Cell> v);
-
-        instruction(std::vector<cell::Cell> ops,
-                    std::vector<op::instruction_operator> op, instruction_type type);
-
-        instruction(
-            std::string table_name,
-            std::vector<std::pair<std::string, std::vector<attributes> > > names,
-            std::vector<std::pair<col_type, cell::Cell> > types);
-
-        instruction_type get_type() const;
-
-        // Can throw runtime error if type not create
-        std::vector<std::pair<std::string, std::vector<attributes> > >
-        &get_columns_names();
-
-        std::vector<std::pair<col_type, cell::Cell> > &get_columns_types();
-
-        std::string &get_table_name();
-    };
-
-    class item {
-    private:
-        std::vector<cell::Cell> row;
-
-    public:
-        item(std::vector<cell::Cell> r);
-
-        // TODO: create helpful methods
-    };
+    class db;
+    class table;
 
     // TODO: Create iterator for result class
     class result {
     private:
-        std::vector<item> queried_cols;
+        std::vector<std::vector<cell::Cell> > queried_cols;
         bool valid = true;
-        instruction_type type;
+        ins::instruction_type type;
         std::string error_msg;
 
     public:
         result() = default;
 
-        result(instruction_type t);
+        result(ins::instruction_type t);
 
-        result(std::vector<item> queried_items);
+        result(std::vector<std::vector<cell::Cell> > queried_items);
 
         // If there was an error
         result(std::string msg);
@@ -106,38 +38,59 @@ namespace memdb {
 
     class header {
     private:
-        std::vector<std::pair<std::string, std::vector<attributes> > > col_names;
-        std::vector<std::pair<col_type, cell::Cell> > col_types;
+        std::vector<std::pair<std::string, std::vector<ins::attributes> > > col_names;
+        std::vector<std::pair<cell::col_type, cell::Cell> > col_types;
 
     public:
         header() = default;
 
-        header(std::vector<std::pair<std::string, std::vector<attributes> > > names,
-               std::vector<std::pair<col_type, cell::Cell> > types);
+        header(std::vector<std::pair<std::string, std::vector<ins::attributes> > > &names,
+               std::vector<std::pair<cell::col_type, cell::Cell> > &types);
 
-        auto &get_columns_names();
+        std::vector<std::pair<std::string, std::vector<ins::attributes>>> &get_columns_names();
 
-        auto &get_columns_types();
+        std::vector<std::pair<cell::col_type, cell::Cell>> &get_columns_types();
+
+        friend table;
     };
 
     class table {
     private:
-        std::vector<item> rows;
+        std::vector<std::vector<cell::Cell> > rows = {};
         header cols;
         int row_size = 0;
 
     public:
         auto &get_ith_col_name(int i);
 
-        table(header h);
+        void insert_row(std::vector<cell::Cell> row);
+
+        table(header &h);
+
+        friend db;
     };
 
     class db {
-        std::unordered_map<std::string, std::unique_ptr<table> > tables;
+        std::unordered_map<std::string, std::shared_ptr<table> > tables;
 
     public:
+        void check_value(
+            cell::Cell &v,
+            std::vector<std::pair<cell::col_type, cell::Cell>> &columns_type, std::vector<std::pair<std::string, std::vector<ins
+            ::attributes>>> &columns_names, size_t i);
+
+        void insert_value(
+            cell::Cell &v, std::vector<cell::Cell> &row_to_insert, size_t i, std::vector<std::pair<cell::col_type, cell::Cell>>
+            &columns_type, std::vector<std::vector<cell::Cell>> &rows, std::vector<std::pair<std::string, std::vector<ins::
+            attributes>>>
+            &columns_names);
+
         result execute(std::string_view query);
 
-        std::string &debug_get_table_ith_col_name(const std::string& name, int i);
+        void load_from_file(std::istream);
+
+        void save_to_file(std::ostream);
+
+        std::string &debug_get_table_ith_col_name(const std::string &name, int i);
     };
 } // namespace memdb

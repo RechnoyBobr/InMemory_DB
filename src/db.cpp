@@ -105,6 +105,7 @@ namespace memdb {
                         } else {
                             throw std::runtime_error("Invalid keyword combination.\n");
                         }
+                        cur_table->insert_row(row_to_insert);
                         ret_val = result(i.get_type());
                         break;
                     }
@@ -145,27 +146,9 @@ namespace memdb {
     }
 
     void table::insert_row(std::vector<cell::Cell> row) {
-        std::vector<cell::Cell> result;
-        auto col_types = cols.col_types;
-        auto col_names = cols.col_names;
-        for (size_t i = 0; i < col_types.size(); i++) {
-            cell::Cell cur = row[i];
-            if (cur.get_cell_type() == cell::EMPTY) {
-                if (cols.col_types[i].second.get_cell_type() != cell::EMPTY) {
-                    result.emplace_back(col_types[i].second);
-                } else if (std::ranges::find(col_names[i].second.begin(), col_names[i].second.end(),
-                                             ins::AUTOINCREMENT) != col_names[i].second.end()) {
-                    if (rows.size() != 0) {
-                        result.emplace_back((*rows.rbegin())[i].copy_and_increment());
-                    } else {
-                        result.emplace_back(0);
-                    }
-                }
-            } else if (cur.get_cell_type() == cols.col_types[i].first) {
-            }
-        }
         rows.emplace_back(row);
     }
+
 
     table::table(header &h) { this->cols = h; }
 

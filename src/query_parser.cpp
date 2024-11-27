@@ -1,8 +1,9 @@
 #include "../inc/query_parser.hpp"
 
+#include <format>
+#include <stack>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "../inc/lexer.hpp"
@@ -82,9 +83,9 @@ namespace basic_parser {
             switch (type) {
                 case ins::instruction_type::CREATE: {
                     size_t ind = 0;
-                    auto col_names = std::vector<std::pair<std::string, std::vector<ins::attributes>>>(0);
+                    auto col_names = std::vector<std::pair<std::string, std::vector<ins::attributes> > >(0);
                     std::string table_name;
-                    std::vector<std::pair<cell::col_type, cell::Cell>> types = {};
+                    std::vector<std::pair<cell::col_type, cell::Cell> > types = {};
                     std::string tmp;
                     std::vector<ins::attributes> attr;
                     cell::Cell default_val;
@@ -228,6 +229,9 @@ namespace basic_parser {
                     break;
                 }
                 case ins::WHERE: {
+                    math_engine engine;
+                    std::string postfix_expr = engine.to_postfix(params);
+
                     break;
                 }
 
@@ -241,55 +245,77 @@ namespace basic_parser {
     cell::col_type query_parser::parse_type(std::string &input) {
         if (input == "int32") {
             return cell::col_type::INT32;
-        } else if (input == "bool") {
-            return cell::col_type::BOOL;
-        } else if (input.contains("string")) {
-            return cell::col_type::STRING;
-        } else if (input.contains("byte")) {
-            return cell::col_type::BYTES;
-        } else {
-            throw std::runtime_error("can't recognize column type");
         }
+        if (input == "bool") {
+            return cell::col_type::BOOL;
+        }
+        if (input.contains("string")) {
+            return cell::col_type::STRING;
+        }
+        if (input.contains("byte")) {
+            return cell::col_type::BYTES;
+        }
+        throw std::runtime_error("can't recognize column type");
     }
 
-    std::vector<ins::instruction> query_parser::math_engine::parse(std::string_view expression) {
-        std::vector<ins::instruction> result;
-        std::vector<std::pair<op::instruction_operator, std::pair<cell::Cell, cell::Cell>>> values;
-        int ind = 0;
-        int subexpression_start = 0;
-        state current_state = START;
-        int bracket_cnt = 0;
-        while (ind != expression.size()) {
-            // This will evaluate expression in the brackets.
-            char cur = expression[ind];
-            if (cur == '(' && current_state == START) {
-                current_state = SUBEXPRESSION;
-                subexpression_start = ind + 1;
-            } else if (cur == '(') {
-                bracket_cnt++;
-            } else if (cur == ')' && current_state == SUBEXPRESSION) {
-                if (!bracket_cnt) {
-                    // Extend vector with result
-                    auto temp = parse(expression.substr(subexpression_start, ind - 1));
-                    result.reserve(result.size() + distance(temp.begin(), temp.end()));
-                    result.insert(result.end(), temp.begin(), temp.end());
-                    current_state = START;
-                } else {
-                    bracket_cnt--;
-                }
-            }
 
-            // Means that we need to find a size of strings or bytes.
-            if (ind < expression.size() && cur == '|' && expression[ind + 1] != '|') {
-                if (expression[ind + 1] == '\"') {
-                    std::string str_to_get_size;
-                    ind += 2;
-                    while (expression[ind] != '\"') {
-                        str_to_get_size += expression[ind];
+    std::string query_parser::math_engine::to_postfix(std::string &expr) {
+        std::string result;
+        std::stack<std::string> ops = std::stack<std::string>();
+        std::string tmp_op;
+        std::string tmp;
+        std::string prev;
+        bool is_last_ch_op = false;
+        int i = 0;
+        while (i < expr.size()) {
+            if (!op_chars.contains(expr[i]) && expr[i] != '(' && expr[i] != ')' && expr[i] != ' ') {
+                while (!op_chars.contains(expr[i]) && expr[i] != ')') {
+                    if (expr[i] != ' ') {
+                        tmp += expr[i];
                     }
+                    i++;
                 }
+                result += tmp + " ";
+                tmp = "";
+                is_last_ch_op = false;
             }
-            ind++;
+            if (expr[i] == '(') {
+                ops.emplace("(");
+            } else if (expr[i] == ')') {
+                while (!ops.empty() && ops.top() != "(") {
+                    result += ops.top() + " ";
+                    ops.pop();
+                }
+                // Delete ( from stack
+                ops.pop();
+            } else if (op_chars.contains(expr[i])) {
+                tmp_op = expr[i];
+                if (i < expr.size() - 1 && expr[i] == expr[i + 1]) {
+                    tmp_op += expr[i + 1];
+                    i++;
+                } else if (is_last_ch_op && expr[i] == '-') {
+                    tmp_op = "~";
+                } else if (is_last_ch_op) {
+                    throw std::runtime_error("There are 2 consecutive operators");
+                }
+
+                is_last_ch_op = true;
+                while (!ops.empty() && priorities[ops.top()] >= priorities[tmp_op]) {
+                    if (ops.top() == "|") {
+                        // Delete second | operator
+                        ops.pop();
+                    }
+                    result += ops.top() + " ";
+                    ops.pop();
+                }
+                ops.emplace(tmp_op);
+                tmp_op = "";
+            }
+            i++;
+        }
+        while (!ops.empty()) {
+            result += ops.top() + " ";
+            ops.pop();
         }
         return result;
     }

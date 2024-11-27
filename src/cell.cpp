@@ -42,4 +42,14 @@ namespace cell {
     bool Cell::get_bool() { return std::get<bool>(value); }
 
     std::vector<std::byte> &Cell::get_bytes() { return std::get<std::vector<std::byte>>(value); }
+
+    bool Cell::operator==(const Cell &cell) const {
+        if (this->get_cell_type() == cell.get_cell_type()) {
+            if (this->value == cell.value) {
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
 } // namespace cell

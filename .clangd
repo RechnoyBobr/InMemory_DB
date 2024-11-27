@@ -1,5 +1,7 @@
 CompileFlags:
+  CompilationDatabase: "compile_settings.json"
   Add:
-    - "-I./inc"
+    - "-I${workspaceFolder}/inc"
+    - "-I../inc/"
     - "-std=c++23"
     - "-Wall"

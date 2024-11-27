@@ -1,15 +1,15 @@
 #include "../inc/query_parser.hpp"
 
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "../inc/lexer.hpp"
+#include "operator.hpp"
 
 namespace basic_parser {
-    cell::Cell query_parser::get_cell(std::string &tmp, cell::col_type cur_type) {
+    cell::Cell query_parser::get_cell(std::string &str, cell::col_type cur_type) {
         cell::Cell ret_value;
         switch (cur_type) {
             case cell::col_type::BYTES: {
@@ -17,7 +17,7 @@ namespace basic_parser {
                 bool flag = false;
                 int cnt_ch = 0;
                 int cur_byte = 0;
-                for (char ch: tmp) {
+                for (char ch: str) {
                     if (flag) {
                         cur_byte <<= 4;
                         std::string char_str;
@@ -34,7 +34,7 @@ namespace basic_parser {
                         cnt_ch = 0;
                     }
                 }
-                if (tmp.size() % 2 != 0) {
+                if (str.size() % 2 != 0) {
                     res.emplace_back(std::byte(cur_byte));
                 }
                 ret_value = cell::Cell(res);
@@ -42,18 +42,18 @@ namespace basic_parser {
             }
             case cell::col_type::STRING: {
                 // trim the quotes
-                std::string trimmed_str = tmp.substr(1, tmp.size() - 2);
+                std::string trimmed_str = str.substr(1, str.size() - 2);
                 ret_value = cell::Cell(trimmed_str);
                 break;
             }
             case cell::col_type::INT32: {
-                ret_value = cell::Cell(std::stoi(tmp));
+                ret_value = cell::Cell(std::stoi(str));
                 break;
             }
             case cell::col_type::BOOL: {
-                if (tmp == "true") {
+                if (str == "true") {
                     ret_value = cell::Cell(true);
-                } else if (tmp == "false") {
+                } else if (str == "false") {
                     ret_value = cell::Cell(false);
                 } else {
                     throw std::runtime_error("Can't recognize default value");
@@ -82,11 +82,9 @@ namespace basic_parser {
             switch (type) {
                 case ins::instruction_type::CREATE: {
                     size_t ind = 0;
-                    auto col_names =
-                            std::vector<std::pair<std::string, std::vector<ins::attributes> > >(
-                                0);
+                    auto col_names = std::vector<std::pair<std::string, std::vector<ins::attributes>>>(0);
                     std::string table_name;
-                    std::vector<std::pair<cell::col_type, cell::Cell> > types = {};
+                    std::vector<std::pair<cell::col_type, cell::Cell>> types = {};
                     std::string tmp;
                     std::vector<ins::attributes> attr;
                     cell::Cell default_val;
@@ -108,8 +106,7 @@ namespace basic_parser {
                             cur_state = DEF_VAL;
                             cur_type = parse_type(tmp);
                             tmp = "";
-                        } else if ((params[ind] == ',' || params[ind] == '}') &&
-                                   cur_state == ATTRIBUTES) {
+                        } else if ((params[ind] == ',' || params[ind] == '}') && cur_state == ATTRIBUTES) {
                             if (tmp == "key") {
                                 attr.emplace_back(ins::attributes::KEY);
                             } else if (tmp == "autoincrement") {
@@ -146,8 +143,7 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    ins::instruction table_create =
-                            ins::instruction(table_name, col_names, types);
+                    ins::instruction table_create = ins::instruction(table_name, col_names, types);
                     result.emplace_back(table_create);
                     break;
                 }
@@ -162,7 +158,7 @@ namespace basic_parser {
                     int insert_type = 1;
                     while (ind < params.size()) {
                         if (params[ind] == '=') {
-                            //Then we should save column name
+                            // Then we should save column name
                             column_name = tmp;
                             tmp = "";
                         }
@@ -211,7 +207,27 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    result.emplace_back(ins::instruction(table_to, ins::TO));
+                    result.emplace_back(table_to, ins::TO);
+                    break;
+                }
+                case ins::SELECT: {
+                    int ind = 0;
+                    std::vector<std::string> columns_from;
+                    std::string tmp;
+                    while (ind < params.size()) {
+                        if (params[ind] == ',') {
+                            columns_from.emplace_back(tmp);
+                        } else if (params[ind] != ' ') {
+                            tmp += params[ind];
+                        }
+                        ind++;
+                    }
+                    if (tmp != "") {
+                        columns_from.emplace_back(tmp);
+                    }
+                    break;
+                }
+                case ins::WHERE: {
                     break;
                 }
 
@@ -236,17 +252,15 @@ namespace basic_parser {
         }
     }
 
-    std::shared_ptr<std::vector<ins::instruction> >
-    query_parser::math_engine::parse(std::string_view expression) {
-        std::shared_ptr<std::vector<ins::instruction> > result;
-        ins::instruction tmp;
+    std::vector<ins::instruction> query_parser::math_engine::parse(std::string_view expression) {
+        std::vector<ins::instruction> result;
+        std::vector<std::pair<op::instruction_operator, std::pair<cell::Cell, cell::Cell>>> values;
         int ind = 0;
         int subexpression_start = 0;
         state current_state = START;
         int bracket_cnt = 0;
         while (ind != expression.size()) {
-            // TODO: rework parse method. Split it to 2 parts. One should parse the
-            // operation and the other the data.
+            // This will evaluate expression in the brackets.
             char cur = expression[ind];
             if (cur == '(' && current_state == START) {
                 current_state = SUBEXPRESSION;
@@ -255,12 +269,27 @@ namespace basic_parser {
                 bracket_cnt++;
             } else if (cur == ')' && current_state == SUBEXPRESSION) {
                 if (!bracket_cnt) {
-                    result = parse(expression.substr(subexpression_start, ind - 1));
+                    // Extend vector with result
+                    auto temp = parse(expression.substr(subexpression_start, ind - 1));
+                    result.reserve(result.size() + distance(temp.begin(), temp.end()));
+                    result.insert(result.end(), temp.begin(), temp.end());
                     current_state = START;
                 } else {
                     bracket_cnt--;
                 }
             }
+
+            // Means that we need to find a size of strings or bytes.
+            if (ind < expression.size() && cur == '|' && expression[ind + 1] != '|') {
+                if (expression[ind + 1] == '\"') {
+                    std::string str_to_get_size;
+                    ind += 2;
+                    while (expression[ind] != '\"') {
+                        str_to_get_size += expression[ind];
+                    }
+                }
+            }
+            ind++;
         }
         return result;
     }

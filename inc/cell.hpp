@@ -35,5 +35,7 @@ namespace cell {
         col_type get_cell_type() const;
         Cell copy_and_increment();
         std::vector<std::byte> &get_bytes();
+
+        bool operator==(const Cell & cell) const;
     };
 } // namespace cell

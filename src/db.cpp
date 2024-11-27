@@ -38,11 +38,21 @@ namespace memdb {
             } else {
                 row_to_insert[i] = (*rows.rbegin())[i].copy_and_increment();
             }
+        } else if (std::ranges::find(columns_names[i].second.begin(), columns_names[i].second.end(), ins::UNIQUE) !=
+                   columns_names[i].second.end() || std::ranges::find(columns_names[i].second.begin(),
+                                                                      columns_names[i].second.end(), ins::KEY) !=
+                   columns_names[i].second.end()) {
+            for(int j = 0; j < rows.size(); j++) {
+                if (rows[j][i] == v) {
+                    throw std::runtime_error("Column have attributes key/unique");
+                }
+            }
         } else if (columns_type[i].second.get_cell_type() != cell::EMPTY && v.get_cell_type() ==
                    cell::EMPTY) {
             row_to_insert[i] = columns_type[i].second;
+        } else {
+            row_to_insert[i] = v;
         }
-        row_to_insert[i] = v;
     }
 
     result db::execute(std::string_view query) {

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <format>
 #include <memory>
+#include <ranges>
 #include <stdexcept>
 
 
@@ -53,10 +54,10 @@ namespace memdb {
 
     result db::execute(std::string_view query) {
         std::vector<ins::instruction> res = basic_parser::query_parser::parse(query);
-        std::vector<cell::Cell> ordered_values;
-        std::unordered_map<std::string, cell::Cell> values_by_name;
+        std::ranges::reverse(res.begin(), res.end());
+        std::shared_ptr<table> cur_table;
         std::vector<int> cols_to_select = {};
-
+        std::vector<std::shared_ptr<table> > tables_to_operate_with = {};
         int insert_type = -1;
         result ret_val;
         try {
@@ -69,26 +70,23 @@ namespace memdb {
                         break;
                     }
                     case ins::INSERT: {
+                        std::vector<cell::Cell> ordered_values;
+                        std::unordered_map<std::string, cell::Cell> values_by_name;
                         if (i.insert_type == 1) {
                             ordered_values = i.get_ordered_values();
                         } else {
                             values_by_name = i.get_values_by_name();
                         }
                         insert_type = i.insert_type;
-                        ret_val = result(i.get_type());
-                        break;
-                    }
-                    case ins::TO: {
-                        auto cur_table = this->tables[i.get_table_name()];
                         std::vector<std::pair<cell::col_type, cell::Cell> > columns_type =
                                 cur_table->cols.get_columns_types();
                         std::vector<std::pair<std::string, std::vector<ins::attributes> > > columns_names =
                                 cur_table->cols.get_columns_names();
                         std::vector<cell::Cell> row_to_insert = std::vector<cell::Cell>(columns_type.size());
                         if (insert_type == 1) {
-                            for (size_t i = 0; i < ordered_values.size(); i++) {
-                                check_value(ordered_values[i], columns_type, columns_names, i);
-                                insert_value(ordered_values[i], row_to_insert, i, columns_type, cur_table->rows,
+                            for (size_t j = 0; j < ordered_values.size(); j++) {
+                                check_value(ordered_values[j], columns_type, columns_names, j);
+                                insert_value(ordered_values[j], row_to_insert, j, columns_type, cur_table->rows,
                                              columns_names);
                             }
                         } else if (insert_type == 2) {
@@ -114,8 +112,18 @@ namespace memdb {
                         ret_val = result(i.get_type());
                         break;
                     }
+                    case ins::TO: {
+                        cur_table = this->tables[i.get_table_name()];
+                        break;
+                    }
                     case ins::SELECT: {
                         std::unordered_map<std::string, std::vector<std::string> > col_to_table_name = i.col_to_tables;
+                    }
+                    case ins::FROM: {
+                        for (auto &name: i.table_names) {
+                            tables_to_operate_with.emplace_back(tables[name]);
+                        }
+                        break;
                     }
                     case ins::WHERE: {
                         std::unique_ptr<std::queue<cell::Cell> > operands = std::make_unique<std::queue<cell::Cell> >(
@@ -123,6 +131,10 @@ namespace memdb {
                         std::unique_ptr<std::queue<op::instruction_operator> > operators = std::make_unique<std::queue<
                             op::instruction_operator> >(i.operators);
                         std::vector<table_view> views;
+                        // TODO: execute every operator with given operands. If operand of column type then proceed to
+                        // executing operator with every cell of that column.
+                        // (Optimization: evaluate every constant operations(without need to iterate through columns)
+
                         break;
                     }
                     default: {

@@ -65,7 +65,6 @@ namespace memdb {
     };
 
 
-    // TODO: Create iterator for result class
     class result {
         std::vector<table_view> result_table_view;
         bool valid = true;

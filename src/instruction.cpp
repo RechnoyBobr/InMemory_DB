@@ -42,7 +42,7 @@ namespace ins {
 
     // insert_type is equal to -1 to clearly indicate that it isn't supposed to be insert instruction
     instruction::instruction(const std::string &table_to) {
-        this->type = CREATE;
+        this->type = TO;
         this->table_name = table_to;
     }
 

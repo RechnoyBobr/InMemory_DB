@@ -61,7 +61,7 @@ namespace memdb {
 
         table_view(std::shared_ptr<table> &table_ptr, std::vector<int> &cols);
 
-        std::vector<cell::Cell> &get_result(size_t cur) const;
+        void get_result(size_t cur, std::vector<cell::Cell> &result);
     };
 
 
@@ -96,7 +96,7 @@ namespace memdb {
 
             std::vector<cell::Cell> *operator->();
 
-            std::vector<cell::Cell> &operator*() const;
+            std::vector<cell::Cell> &operator*();
         };
 
         result() = default;

@@ -173,23 +173,18 @@ namespace memdb {
             if (current_col >= src.size()) {
                 continue;
             }
-            for (auto &i: src.get_result(current_col)) {
-                resulting_vector.emplace_back(i);
-            }
+            src.get_result(current_col, resulting_vector);
         }
         return &resulting_vector;
     }
 
-    std::vector<cell::Cell> &result::iterator::operator*() const {
-        std::vector<cell::Cell> resulting_vector = {};
-
-        for (const auto &src: sources) {
+    std::vector<cell::Cell> &result::iterator::operator*() {
+        resulting_vector.clear();
+        for (auto &src: sources) {
             if (current_col >= src.size()) {
                 continue;
             }
-            for (auto &i: src.get_result(current_col)) {
-                resulting_vector.emplace_back(i);
-            }
+            src.get_result(current_col, resulting_vector);
         }
         return resulting_vector;
     }
@@ -246,12 +241,10 @@ namespace memdb {
         this->choosed_columns = cols;
     }
 
-    std::vector<cell::Cell> &table_view::get_result(size_t cur) const {
-        std::vector<cell::Cell> result = {};
-        for (int i: choosed_columns) {
+    void table_view::get_result(size_t cur, std::vector<cell::Cell> &result) {
+        for (const int i: choosed_columns) {
             result.emplace_back(table_src->rows[cur][i]);
         }
-        return result;
     }
 
 

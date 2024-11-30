@@ -228,7 +228,7 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    result.emplace_back(table_to, ins::TO);
+                    result.emplace_back(table_to);
                     break;
                 }
                 case ins::SELECT: {
@@ -278,7 +278,7 @@ namespace basic_parser {
                             tmp += param;
                         }
                     }
-                    result.emplace_back(table_names, type);
+                    result.emplace_back(table_names);
                 }
                 case ins::WHERE: {
                     math_engine engine;

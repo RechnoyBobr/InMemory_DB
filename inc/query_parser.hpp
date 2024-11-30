@@ -21,7 +21,6 @@ namespace basic_parser {
         // TODO: It should return array of instructions to run
     public:
         class math_engine {
-            std::string op_chars = "|&^=!<>-+*/%";
             std::unordered_map<std::string, int> priorities = {
                 {"(", 0}, {"||", 1}, {"&&", 2}, {"^^", 3}, {"=", 4}, {"!=", 4}, {"<", 5}, {"<=", 5}, {">", 5},
                 {">=", 5}, {"-", 6}, {"+", 6}, {"*", 7}, {"/", 7}, {"%", 7}, /*if number is negative*/{"~", 8}, {"|", 8}
@@ -33,14 +32,16 @@ namespace basic_parser {
                 SUBEXPRESSION,
             };
 
-            int get_num_from_string;
-
         public:
+            const std::string op_chars = "|&^=!<>-+*/%";
+
             // Returns the result of calculated expression
             std::string to_postfix(std::string &expr);
         };
 
         static cell::Cell get_cell(std::string &str, cell::col_type cur_type);
+        static cell::Cell get_cell(std::string &str);
+        static cell::col_type get_cell_type_by_value(std::string tmp);
 
         static std::vector<ins::instruction> parse(std::string_view query);
     };

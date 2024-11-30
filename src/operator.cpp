@@ -4,7 +4,7 @@
 #include <variant>
 
 namespace op {
-    instruction_operator::instruction_operator(std::string_view query) {
+    instruction_operator::instruction_operator(std::string &query) {
         if (query.contains("+")) {
             type = ADD;
         } else if (query.contains("-")) {
@@ -35,11 +35,13 @@ namespace op {
             type = SIZE;
         } else if (query.contains("^")) {
             type = XOR;
+        } else if (query.contains("~")) {
+            type = NEG;
         }
     }
 
-    std::variant<std::string_view, int> instruction_operator::exec_op(
-        std::string s1, std::string s2) {
+    std::variant<std::string, int> instruction_operator::exec_op(
+        std::string &s1, std::string &s2) const {
         switch (type) {
             case L:
                 return s1 < s2;
@@ -56,14 +58,14 @@ namespace op {
             case SIZE:
                 return static_cast<int>(s1.size());
             case ADD:
-                return std::string_view(s1 + s2);
+                return std::string(s1 + s2);
             default:
                 throw std::runtime_error("String type does not support that operation");
         }
     }
 
-    int instruction_operator::exec_op(std::vector<std::byte> bytes1,
-                                      std::vector<std::byte> bytes2) {
+    int instruction_operator::exec_op(std::vector<std::byte> &bytes1,
+                                      std::vector<std::byte> &bytes2) const {
         switch (type) {
             case L:
                 return bytes1 < bytes2;
@@ -139,6 +141,13 @@ namespace op {
             default:
                 throw std::runtime_error("Bool does not support that operation");
         }
+    }
+
+    bool instruction_operator::is_single() const {
+        if (type == INV || type == SIZE || type == NEG) {
+            return true;
+        }
+        return false;
     }
 } // namespace op
 //

@@ -1,10 +1,18 @@
 #include "../inc/instruction.hpp"
 
 namespace ins {
-    instruction::instruction(std::unordered_map<std::string, cell::Cell> &v) {
-        values_by_name = std::move(v);
+    instruction::instruction(const std::unordered_map<std::string, cell::Cell> &v) {
+        values_by_name = v;
         type = INSERT;
         insert_type = 2;
+    }
+
+    instruction::instruction(const std::queue<cell::Cell> &operands,
+                             const std::queue<op::instruction_operator> &operators,
+                             instruction_type type) {
+        this->operands = operands;
+        this->operators = operators;
+        this->type = type;
     }
 
     std::vector<cell::Cell> &instruction::get_ordered_values() {
@@ -15,37 +23,39 @@ namespace ins {
         return values_by_name;
     }
 
-    instruction::instruction(std::vector<cell::Cell> v) {
-        values_ordered = std::move(v);
+    instruction::instruction(const std::vector<std::string> &col_names) {
+        type = FROM;
+        table_names = col_names;
+        this->type = type;
+    }
+
+    instruction::instruction(const std::unordered_map<std::string, std::vector<std::string> > &cols_tables) {
+        this->col_to_tables = cols_tables;
+        type = SELECT;
+    }
+
+    instruction::instruction(const std::vector<cell::Cell> &v) {
+        values_ordered = v;
         type = INSERT;
         insert_type = 1;
     }
-// insert_type is equal to -1 to clearly indicate that it isn't supposed to be insert instruction
-    instruction::instruction(const std::string &table_to, instruction_type type) {
-        this->type = type;
+
+    // insert_type is equal to -1 to clearly indicate that it isn't supposed to be insert instruction
+    instruction::instruction(const std::string &table_to) {
+        this->type = CREATE;
         this->table_name = table_to;
-        this->insert_type = -1;
     }
 
-    instruction::instruction(std::vector<cell::Cell> &ops,
-                             std::vector<op::instruction_operator> &op,
-                             instruction_type type) {
-        this->operands = std::move(ops);
-        this->operators = std::move(op);
-        this->type = type;
-        this->insert_type = -1;
-    }
 
     // If instruction is create table
     instruction::instruction(
-        std::string &table_name,
-        std::vector<std::pair<std::string, std::vector<attributes> > > &names,
-        std::vector<std::pair<cell::col_type, cell::Cell> > &types) {
+        const std::string &table_name,
+        const std::vector<std::pair<std::string, std::vector<attributes> > > &names,
+        const std::vector<std::pair<cell::col_type, cell::Cell> > &types) {
         this->table_name = table_name;
         this->col_types = types;
         this->col_names = names;
         this->type = CREATE;
-        this->insert_type = -1;
     }
 
     std::vector<std::pair<std::string, std::vector<attributes> > > &instruction::get_columns_names() {

@@ -1,6 +1,7 @@
 #include "../inc/query_parser.hpp"
 
 #include <format>
+#include <queue>
 #include <stack>
 #include <stdexcept>
 #include <string>
@@ -44,7 +45,7 @@ namespace basic_parser {
             case cell::col_type::STRING: {
                 // trim the quotes
                 std::string trimmed_str = str.substr(1, str.size() - 2);
-                ret_value = cell::Cell(trimmed_str);
+                ret_value = cell::Cell(trimmed_str, cell::STRING);
                 break;
             }
             case cell::col_type::INT32: {
@@ -57,17 +58,47 @@ namespace basic_parser {
                 } else if (str == "false") {
                     ret_value = cell::Cell(false);
                 } else {
-                    throw std::runtime_error("Can't recognize default value");
+                    throw std::runtime_error("Can't recognize cell value");
                 }
+                break;
             }
             case cell::col_type::EMPTY: {
-                return {};
+                break;
+            }
+            case cell::col_type::COL_NAME: {
+                ret_value = cell::Cell(str, cell::COL_NAME);
+                break;
             }
             default: {
                 throw std::runtime_error("There is no such type. The error is bogus\n");
             }
         }
         return ret_value;
+    }
+
+    cell::Cell query_parser::get_cell(std::string &str) {
+        cell::col_type type = get_cell_type_by_value(str);
+        return get_cell(str, type);
+    }
+
+    cell::col_type query_parser::get_cell_type_by_value(std::string tmp) {
+        cell::col_type cur_type;
+        if (tmp.contains('\"')) {
+            cur_type = cell::col_type::STRING;
+        } else if (tmp.contains('x')) {
+            cur_type = cell::col_type::BYTES;
+        } else if (tmp == "true" || tmp == "false") {
+            cur_type = cell::col_type::BOOL;
+        } else if (tmp[0] == '-' || tmp[0] == '+' || std::isdigit(tmp[0])) {
+            cur_type = cell::col_type::INT32;
+        } else if (!tmp.empty()) {
+            // If type is not recognized program will consider it being column name
+            // And maybe it will throw an error of unknown column name
+            cur_type = cell::col_type::COL_NAME;
+        } else {
+            cur_type = cell::col_type::EMPTY;
+        }
+        return cur_type;
     }
 
     std::vector<ins::instruction> query_parser::parse(std::string_view query) {
@@ -164,18 +195,7 @@ namespace basic_parser {
                             tmp = "";
                         }
                         if (params[ind] == ')' || params[ind] == ',') {
-                            cell::col_type cur_type;
-                            if (tmp.contains('\"')) {
-                                cur_type = cell::col_type::STRING;
-                            } else if (tmp.contains('x')) {
-                                cur_type = cell::col_type::BYTES;
-                            } else if (std::isalpha(tmp[0])) {
-                                cur_type = cell::col_type::BOOL;
-                            } else if (tmp[0] == '-' || tmp[0] == '+' || std::isdigit(tmp[0])) {
-                                cur_type = cell::col_type::INT32;
-                            } else {
-                                cur_type = cell::col_type::EMPTY;
-                            }
+                            cell::col_type cur_type = get_cell_type_by_value(tmp);
                             cell::Cell c;
                             if (!tmp.empty()) {
                                 c = get_cell(tmp, cur_type);
@@ -213,25 +233,80 @@ namespace basic_parser {
                 }
                 case ins::SELECT: {
                     int ind = 0;
-                    std::vector<std::string> columns_from;
+                    std::unordered_map<std::string, std::vector<std::string> > cols_to_tables;
                     std::string tmp;
+                    std::string col_name;
+                    std::string table_name;
+                    bool is_col = false;
                     while (ind < params.size()) {
                         if (params[ind] == ',') {
-                            columns_from.emplace_back(tmp);
+                            if (cols_to_tables.contains(col_name)) {
+                                cols_to_tables[col_name].emplace_back(table_name);
+                            } else {
+                                cols_to_tables[col_name] = std::vector<std::string>(1, table_name);
+                            }
+                            col_name = "";
+                            table_name = "";
+                        } else if (params[ind] == '.') {
+                            is_col = true;
+                        } else if (is_col && params[ind] != ' ') {
+                            col_name += params[ind];
                         } else if (params[ind] != ' ') {
-                            tmp += params[ind];
+                            table_name += params[ind];
                         }
+
                         ind++;
                     }
-                    if (tmp != "") {
-                        columns_from.emplace_back(tmp);
+                    if (!tmp.empty()) {
+                        if (cols_to_tables.contains(col_name)) {
+                            cols_to_tables[col_name].emplace_back(table_name);
+                        } else {
+                            cols_to_tables[col_name] = std::vector<std::string>(1, table_name);
+                        }
                     }
+                    result.emplace_back(cols_to_tables);
                     break;
+                }
+                case ins::FROM: {
+                    std::vector<std::string> table_names = {};
+                    std::string tmp;
+                    for (char param: params) {
+                        if (param == ',') {
+                            table_names.emplace_back(tmp);
+                            tmp = "";
+                        } else if (param != ' ') {
+                            tmp += param;
+                        }
+                    }
+                    result.emplace_back(table_names, type);
                 }
                 case ins::WHERE: {
                     math_engine engine;
                     std::string postfix_expr = engine.to_postfix(params);
-
+                    const std::string op_chars = engine.op_chars;
+                    int i = 0;
+                    std::string tmp;
+                    // queue for operands
+                    std::queue<cell::Cell> operands;
+                    std::queue<op::instruction_operator> operators;
+                    while (i < postfix_expr.size()) {
+                        if (!op_chars.contains(postfix_expr[i]) && postfix_expr[i] != ' ') {
+                            tmp += postfix_expr[i];
+                        } else if (postfix_expr[i] != ' ') {
+                            // It's an operator
+                            operands.emplace(get_cell(tmp));
+                            tmp = "";
+                            tmp += postfix_expr[i];
+                            if (i < postfix_expr.size() - 1 && postfix_expr[i] == postfix_expr[i + 1]) {
+                                tmp += postfix_expr[i + 1];
+                                i++;
+                            }
+                            operators.emplace(tmp);
+                            tmp = "";
+                        }
+                        i++;
+                    }
+                    result.emplace_back(operands, operators, type);
                     break;
                 }
 
@@ -267,10 +342,14 @@ namespace basic_parser {
         std::string prev;
         bool is_last_ch_op = false;
         int i = 0;
+        bool is_string = false;
         while (i < expr.size()) {
             if (!op_chars.contains(expr[i]) && expr[i] != '(' && expr[i] != ')' && expr[i] != ' ') {
-                while (!op_chars.contains(expr[i]) && expr[i] != ')') {
-                    if (expr[i] != ' ') {
+                while (i < expr.size() && !op_chars.contains(expr[i]) && expr[i] != ')') {
+                    if (expr[i] == '\"') {
+                        is_string = !is_string;
+                    }
+                    if (expr[i] != ' ' || is_string) {
                         tmp += expr[i];
                     }
                     i++;
@@ -295,20 +374,18 @@ namespace basic_parser {
                     i++;
                 } else if (is_last_ch_op && expr[i] == '-') {
                     tmp_op = "~";
-                } else if (is_last_ch_op) {
+                } else if (is_last_ch_op && result.at(result.size() - 2) != '|') {
                     throw std::runtime_error("There are 2 consecutive operators");
                 }
 
                 is_last_ch_op = true;
                 while (!ops.empty() && priorities[ops.top()] >= priorities[tmp_op]) {
-                    if (ops.top() == "|") {
-                        // Delete second | operator
-                        ops.pop();
-                    }
                     result += ops.top() + " ";
                     ops.pop();
                 }
-                ops.emplace(tmp_op);
+                if (result.empty() || result.at(result.size() - 2) != '|' || tmp_op != "|") {
+                    ops.emplace(tmp_op);
+                }
                 tmp_op = "";
             }
             i++;

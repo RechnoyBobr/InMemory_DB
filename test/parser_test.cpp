@@ -32,3 +32,10 @@ TEST(parser_test, basic_insert_test) {
         }
     }
 }
+
+TEST(parser_test, select_where_test) {
+    basic_parser::query_parser parser;
+    auto res = parser.parse("select user.id, user.password_hash where |id| % 2 = 0");
+    EXPECT_EQ(res[0].get_type(), ins::SELECT);
+    EXPECT_EQ(res[1].get_type(), ins::WHERE);
+}

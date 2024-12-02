@@ -108,6 +108,8 @@ namespace basic_parser {
         // the comma are only met in attributes or different cols
         std::vector<ins::instruction> result = std::vector<ins::instruction>(0);
         parser_state cur_state = TABLE_NAME;
+        std::vector<std::string> select_col_names;
+        bool select_without_dot = false;
         for (const auto &pair: lexed_commands) {
             ins::instruction_type type = pair.first;
             std::string params = pair.second;
@@ -194,7 +196,7 @@ namespace basic_parser {
                             column_name = tmp;
                             tmp = "";
                         }
-                        if (params[ind] == ')' || params[ind] == ',') {
+                        else if (params[ind] == ')' || params[ind] == ',') {
                             cell::col_type cur_type = get_cell_type_by_value(tmp);
                             cell::Cell c;
                             if (!tmp.empty()) {
@@ -207,7 +209,7 @@ namespace basic_parser {
                                 insert_type = 2;
                                 values_by_name[column_name] = c;
                             }
-                        } else if (params[ind] != ' ') {
+                        } else if (params[ind] != ' ' && params[ind] != '(') {
                             tmp += params[ind];
                         }
                         ind++;
@@ -240,6 +242,12 @@ namespace basic_parser {
                     bool is_col = false;
                     while (ind < params.size()) {
                         if (params[ind] == ',') {
+                            if (!is_col && table_name != "") {
+                                select_col_names.emplace_back(table_name);
+                                table_name = "";
+                                ind++;
+                                continue;
+                            }
                             if (cols_to_tables.contains(col_name)) {
                                 cols_to_tables[col_name].emplace_back(table_name);
                             } else {
@@ -253,6 +261,10 @@ namespace basic_parser {
                             col_name += params[ind];
                         } else if (params[ind] != ' ') {
                             table_name += params[ind];
+                        } else if (params[ind] == ' ' && table_name != "") {
+                            // When there is no table prefixes like table.column
+                            select_col_names.emplace_back(table_name);
+                            select_without_dot = true;
                         }
 
                         ind++;
@@ -261,13 +273,16 @@ namespace basic_parser {
                         if (cols_to_tables.contains(col_name)) {
                             cols_to_tables[col_name].emplace_back(table_name);
                         } else {
-                            cols_to_tables[col_name] = std::vector<std::string>(1, table_name);
+                            cols_to_tables[col_name] = std::vector(1, table_name);
                         }
                     }
-                    result.emplace_back(cols_to_tables);
+                    if (!cols_to_tables.empty()) {
+                        result.emplace_back(cols_to_tables);
+                    }
                     break;
                 }
                 case ins::FROM: {
+                    std::unordered_map<std::string, std::vector<std::string> > cols_to_tables;
                     std::vector<std::string> table_names = {};
                     std::string tmp;
                     for (char param: params) {
@@ -278,7 +293,17 @@ namespace basic_parser {
                             tmp += param;
                         }
                     }
+                    if (tmp != "") {
+                        if (select_without_dot) {
+                            for (auto &x: select_col_names) {
+                                cols_to_tables[x].emplace_back(tmp);
+                            }
+                            result.emplace_back(cols_to_tables);
+                        }
+                        table_names.emplace_back(tmp);
+                    }
                     result.emplace_back(table_names);
+                    break;
                 }
                 case ins::WHERE: {
                     math_engine engine;
@@ -286,27 +311,46 @@ namespace basic_parser {
                     const std::string op_chars = engine.op_chars;
                     int i = 0;
                     std::string tmp;
+
                     // queue for operands
-                    std::queue<cell::Cell> operands;
-                    std::queue<op::instruction_operator> operators;
+                    std::stack<cell::Cell> operands;
+                    std::stack<op::instruction_operator> ops;
+                    op::instruction_operator v1 = op::instruction_operator();
+                    op::instruction_operator v2;
                     while (i < postfix_expr.size()) {
                         if (!op_chars.contains(postfix_expr[i]) && postfix_expr[i] != ' ') {
                             tmp += postfix_expr[i];
                         } else if (postfix_expr[i] != ' ') {
                             // It's an operator
-                            operands.emplace(get_cell(tmp));
+                            cell::Cell c1 = get_cell(tmp);
+                            if (tmp == "") {
+                                v2 = ops.top();
+                                ops.pop();
+                            } else {
+                                v2 = op::instruction_operator(c1);
+                            }
                             tmp = "";
                             tmp += postfix_expr[i];
                             if (i < postfix_expr.size() - 1 && postfix_expr[i] == postfix_expr[i + 1]) {
                                 tmp += postfix_expr[i + 1];
                                 i++;
                             }
-                            operators.emplace(tmp);
+
+                            if (tmp == "~" || tmp == "|" || tmp == "!") {
+                                ops.emplace(tmp, v2);
+                            } else {
+                                ops.emplace(tmp, ops.top(), v2);
+                            }
+
                             tmp = "";
                         }
                         i++;
                     }
-                    result.emplace_back(operands, operators, type);
+                    op::instruction_operator res = ops.top();
+                    while (!ops.empty()) {
+                        ops.pop();
+                    }
+                    result.emplace_back(res, type);
                     break;
                 }
 

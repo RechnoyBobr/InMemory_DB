@@ -1,13 +1,18 @@
 #pragma once
 #include <cstddef>
-#include <string_view>
-#include <variant>
+#include <memory>
+#include <unordered_map>
 #include <vector>
+
+#include "cell.hpp"
 
 namespace op {
     class instruction_operator {
-    private:
+        std::shared_ptr<instruction_operator> v1, v2;
+        cell::Cell v;
+
         enum op_type {
+            VALUE,
             ADD,
             SUB,
             MUL,
@@ -30,15 +35,24 @@ namespace op {
         op_type type;
 
     public:
-        instruction_operator(std::string &query);
+        instruction_operator();
 
-        std::variant<std::string, int> exec_op(std::string &s1, std::string &s2) const;
+        instruction_operator(cell::Cell &value);
 
-        int exec_op(int i1, int i2);
+        instruction_operator(std::string &query, instruction_operator value1, instruction_operator value2);
 
-        bool exec_op(bool b1, bool b2);
+        instruction_operator(std::string &query, instruction_operator value1);
 
-        int exec_op(std::vector<std::byte> &bytes1, std::vector<std::byte> &bytes2) const;
+        cell::Cell exec_operator(std::unordered_map<std::string, cell::Cell> &line);
+
+        cell::Cell exec_op(std::string &s1, std::string &s2) const;
+
+        cell::Cell exec_op(int i1, int i2);
+
+        cell::Cell exec_op(bool b1, bool b2);
+
+        cell::Cell exec_op(std::vector<std::byte> &bytes1, std::vector<std::byte> &bytes2) const;
+
         bool is_single() const;
     };
 } // namespace op

@@ -26,8 +26,7 @@ namespace ins {
         // If type is FROM
         std::vector<std::string> table_names;
         // If type WHERE
-        std::queue<cell::Cell> operands;
-        std::queue<op::instruction_operator> operators;
+        op::instruction_operator operators;
         // If type is create table
         std::vector<std::pair<std::string, std::vector<attributes> > > col_names;
         std::vector<std::pair<cell::col_type, cell::Cell> > col_types;
@@ -59,7 +58,7 @@ namespace ins {
 
         instruction(const std::unordered_map<std::string, cell::Cell> &v);
 
-        instruction(const std::queue<cell::Cell> &operands, const std::queue<op::instruction_operator> &operators,
+        instruction(op::instruction_operator operators,
                     instruction_type type);
 
 

@@ -5,6 +5,7 @@
 #include <format>
 #include <memory>
 #include <ranges>
+#include <stack>
 #include <stdexcept>
 
 
@@ -31,7 +32,7 @@ namespace memdb {
         if (v.get_cell_type() == cell::EMPTY &&
             std::ranges::find(columns_names[i].second.begin(), columns_names[i].second.end(), ins::AUTOINCREMENT) !=
             columns_names[i].second.end()) {
-            if (i == 0) {
+            if (rows.size() == 0) {
                 row_to_insert[i] = cell::Cell(0);
             } else {
                 row_to_insert[i] = (*rows.rbegin())[i].copy_and_increment();
@@ -45,6 +46,7 @@ namespace memdb {
                     throw std::runtime_error("Column have attributes key/unique");
                 }
             }
+            row_to_insert[i] = v;
         } else if (columns_type[i].second.get_cell_type() != cell::EMPTY && v.get_cell_type() == cell::EMPTY) {
             row_to_insert[i] = columns_type[i].second;
         } else {
@@ -56,8 +58,9 @@ namespace memdb {
         std::vector<ins::instruction> res = basic_parser::query_parser::parse(query);
         std::ranges::reverse(res.begin(), res.end());
         std::shared_ptr<table> cur_table;
-        std::vector<int> cols_to_select = {};
         std::vector<std::shared_ptr<table> > tables_to_operate_with = {};
+        // First one is the value of the columns
+        op::instruction_operator instruction_root;
         int insert_type = -1;
         result ret_val;
         try {
@@ -76,6 +79,7 @@ namespace memdb {
                             ordered_values = i.get_ordered_values();
                         } else {
                             values_by_name = i.get_values_by_name();
+                            ordered_values = std::vector<cell::Cell>(cur_table->cols.get_columns_names().size());
                         }
                         insert_type = i.insert_type;
                         std::vector<std::pair<cell::col_type, cell::Cell> > columns_type =
@@ -83,31 +87,21 @@ namespace memdb {
                         std::vector<std::pair<std::string, std::vector<ins::attributes> > > columns_names =
                                 cur_table->cols.get_columns_names();
                         std::vector<cell::Cell> row_to_insert = std::vector<cell::Cell>(columns_type.size());
-                        if (insert_type == 1) {
-                            for (size_t j = 0; j < ordered_values.size(); j++) {
-                                check_value(ordered_values[j], columns_type, columns_names, j);
-                                insert_value(ordered_values[j], row_to_insert, j, columns_type, cur_table->rows,
-                                             columns_names);
-                            }
-                        } else if (insert_type == 2) {
-                            for (auto &[k, v]: values_by_name) {
-                                size_t index_to_ins =
-                                        std::ranges::find_if(
-                                            columns_names.begin(), columns_names.end(),
-                                            [&k](const std::pair<std::string, std::vector<ins::attributes> > &elem) {
-                                                return elem.first == k;
-                                            }) -
-                                        columns_names.begin();
-                                if (index_to_ins == columns_names.size()) {
-                                    throw std::runtime_error(std::format("Can't find column with such name: {}", k));
-                                }
-                                check_value(v, columns_type, columns_names, index_to_ins);
-                                insert_value(v, row_to_insert, index_to_ins, columns_type, cur_table->rows,
-                                             columns_names);
-                            }
-                        } else {
+                        if (insert_type == -1) {
                             throw std::runtime_error("Invalid keyword combination.\n");
                         }
+                        if (insert_type == 2) {
+                            for (auto &[k, v]: values_by_name) {
+                                size_t index_to_ins = cur_table->cols.col_name_to_ind[k];
+                                ordered_values[index_to_ins] = v;
+                            }
+                        }
+                        for (size_t j = 0; j < ordered_values.size(); j++) {
+                            check_value(ordered_values[j], columns_type, columns_names, j);
+                            insert_value(ordered_values[j], row_to_insert, j, columns_type, cur_table->rows,
+                                         columns_names);
+                        }
+
                         cur_table->insert_row(row_to_insert);
                         ret_val = result(i.get_type());
                         break;
@@ -117,7 +111,62 @@ namespace memdb {
                         break;
                     }
                     case ins::SELECT: {
+                        // TODO: Debug the whole thing.
                         std::unordered_map<std::string, std::vector<std::string> > col_to_table_name = i.col_to_tables;
+                        std::vector<std::string> cols_to_select = {};
+                        std::vector<int> rows_to_select = {};
+                        size_t max = 0;
+                        for (auto j: tables_to_operate_with) {
+                            if (j->rows.size() > max) {
+                                max = j->rows.size();
+                            }
+                        }
+                        for (int j = 0; j < max; j++) {
+                            for (auto t: tables_to_operate_with) {
+                                std::unordered_map<std::string, cell::Cell> cur_row = {};
+                                if (j < t->rows.size()) {
+                                    for (int c = 0; c < t->rows[j].size(); c++) {
+                                        std::string col_name = t->cols.get_columns_names()[c].first;
+                                        cur_row[col_name] = t->rows[j][c];
+                                    }
+                                    cell::Cell result = instruction_root.exec_operator(cur_row);
+                                    if (result.get<bool>()) {
+                                        rows_to_select.emplace_back(j);
+                                    }
+                                }
+                            }
+                        }
+                        std::vector<table_view> resulting_vector;
+                        int streak = 0;
+                        int prev = -1;
+                        std::vector<std::vector<int> > rows_from_tables = std::vector<std::vector<int> >(
+                            tables_to_operate_with.size());
+                        std::vector<std::vector<int> > cols_from_tables = std::vector<std::vector<
+                            int> >(tables_to_operate_with.size());
+                        for (auto &[k,v]: col_to_table_name) {
+                            for (auto &str: v) {
+                                int ind = std::ranges::find(tables_to_operate_with.begin(),
+                                                            tables_to_operate_with.end(),
+                                                            this->tables[str]) - tables_to_operate_with.begin();
+                                auto current_table = tables_to_operate_with[ind];
+                                cols_from_tables[ind].emplace_back(current_table->cols.col_name_to_ind[k]);
+                            }
+                        }
+                        for (int row_n: rows_to_select) {
+                            if (row_n == prev) {
+                                streak++;
+                            } else {
+                                streak = 0;
+                            }
+                            // If we have 2 same values then it means that  operations from first table was true and from second table too.
+                            rows_from_tables[streak].emplace_back(row_n);
+                            prev = row_n;
+                        }
+                        for (int j = 0; j < rows_from_tables.size(); j++) {
+                            resulting_vector.emplace_back(tables_to_operate_with[j], rows_from_tables[j],
+                                                          cols_from_tables[j]);
+                        }
+                        ret_val = result(resulting_vector);
                     }
                     case ins::FROM: {
                         for (auto &name: i.table_names) {
@@ -126,15 +175,7 @@ namespace memdb {
                         break;
                     }
                     case ins::WHERE: {
-                        std::unique_ptr<std::queue<cell::Cell> > operands = std::make_unique<std::queue<cell::Cell> >(
-                            i.operands);
-                        std::unique_ptr<std::queue<op::instruction_operator> > operators = std::make_unique<std::queue<
-                            op::instruction_operator> >(i.operators);
-                        std::vector<table_view> views;
-                        // TODO: execute every operator with given operands. If operand of column type then proceed to
-                        // executing operator with every cell of that column.
-                        // (Optimization: evaluate every constant operations(without need to iterate through columns)
-
+                        instruction_root = i.operators;
                         break;
                     }
                     default: {
@@ -203,9 +244,10 @@ namespace memdb {
 
     result::result(std::vector<table_view> views) {
         this->result_table_view = views;
-        for (auto &i: result_table_view) {
-            if (max_size < i.size()) {
-                max_size = i.size();
+        max_size = 0;
+        for (auto &i: this->result_table_view) {
+            if (i.choosed_rows.size() > max_size) {
+                max_size = i.choosed_rows.size();
             }
         }
     }
@@ -224,6 +266,11 @@ namespace memdb {
     header::header(std::vector<std::pair<std::string, std::vector<ins::attributes> > > &names,
                    std::vector<std::pair<cell::col_type, cell::Cell> > &types) {
         this->col_names = names;
+        int ind = 0;
+        for (auto &i: col_names) {
+            col_name_to_ind[i.first] = ind;
+            ind++;
+        }
         this->col_types = types;
     }
 
@@ -236,14 +283,15 @@ namespace memdb {
         return table_src->rows.size();
     }
 
-    table_view::table_view(std::shared_ptr<table> &table_ptr, std::vector<int> &cols) {
+    table_view::table_view(std::shared_ptr<table> &table_ptr, std::vector<int> &rows, std::vector<int> &cols) {
         this->table_src = table_ptr;
         this->choosed_columns = cols;
+        this->choosed_rows = rows;
     }
 
     void table_view::get_result(size_t cur, std::vector<cell::Cell> &result) {
-        for (const int i: choosed_columns) {
-            result.emplace_back(table_src->rows[cur][i]);
+        for (const auto &j: choosed_columns) {
+            result.emplace_back(table_src->rows[choosed_rows[cur]][j]);
         }
     }
 

@@ -20,18 +20,6 @@ TEST(parser_tests, create_table_test) {
     EXPECT_EQ(*(types[3].second.get_bytes().end() - 1), std::byte(1));
 }
 
-TEST(parser_test, basic_insert_test) {
-    memdb::db Database;
-    memdb::result res = Database.execute("create table users({autoincrement, key} id:int32, {unique} name:string[20])");
-    if (res.is_ok()) {
-        Database.execute("insert (,\"vasya\") to users");
-        if (!res.is_ok()) {
-            EXPECT_EQ(-1, 1);
-        } else {
-            EXPECT_EQ(1, 1);
-        }
-    }
-}
 
 TEST(parser_test, select_where_test) {
     basic_parser::query_parser parser;

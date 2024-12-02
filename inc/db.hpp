@@ -19,6 +19,7 @@ namespace memdb {
     class header {
         std::vector<std::pair<std::string, std::vector<ins::attributes> > > col_names;
         std::vector<std::pair<cell::col_type, cell::Cell> > col_types;
+        std::unordered_map<std::string, int> col_name_to_ind;
 
     public:
         header() = default;
@@ -31,6 +32,7 @@ namespace memdb {
         std::vector<std::pair<cell::col_type, cell::Cell> > &get_columns_types();
 
         friend table;
+        friend db;
     };
 
     class table {
@@ -52,14 +54,16 @@ namespace memdb {
 
     class table_view {
         std::shared_ptr<table> table_src = nullptr;
+        std::vector<int> choosed_rows;
         std::vector<int> choosed_columns;
+        friend result;
 
     public:
         table_view() = default;
 
         size_t size() const;
 
-        table_view(std::shared_ptr<table> &table_ptr, std::vector<int> &cols);
+        table_view(std::shared_ptr<table> &table_ptr, std::vector<int> &rows, std::vector<int> &cols);
 
         void get_result(size_t cur, std::vector<cell::Cell> &result);
     };

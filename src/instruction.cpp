@@ -7,10 +7,9 @@ namespace ins {
         insert_type = 2;
     }
 
-    instruction::instruction(const std::queue<cell::Cell> &operands,
-                             const std::queue<op::instruction_operator> &operators,
-                             instruction_type type) {
-        this->operands = operands;
+    instruction::instruction(
+        op::instruction_operator operators,
+        instruction_type type) {
         this->operators = operators;
         this->type = type;
     }

@@ -104,8 +104,6 @@ namespace basic_parser {
     std::vector<ins::instruction> query_parser::parse(std::string_view query) {
         basic_lexer::lexer l = basic_lexer::lexer();
         auto lexed_commands = l.tokenize(query);
-        // TODO: there is quite a large mess.
-        // the comma are only met in attributes or different cols
         std::vector<ins::instruction> result = std::vector<ins::instruction>(0);
         parser_state cur_state = TABLE_NAME;
         std::vector<std::string> select_col_names;
@@ -230,7 +228,7 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    result.emplace_back(table_to);
+                    result.emplace_back(table_to, ins::TO);
                     break;
                 }
                 case ins::SELECT: {
@@ -242,7 +240,7 @@ namespace basic_parser {
                     bool is_col = false;
                     while (ind < params.size()) {
                         if (params[ind] == ',') {
-                            if (!is_col && table_name != "") {
+                            if (!is_col && !table_name.empty()) {
                                 select_col_names.emplace_back(table_name);
                                 table_name = "";
                                 ind++;
@@ -331,7 +329,7 @@ namespace basic_parser {
                             }
                             tmp = "";
                             tmp += postfix_expr[i];
-                            if (i < postfix_expr.size() - 1 && postfix_expr[i] == postfix_expr[i + 1]) {
+                            if (i < postfix_expr.size() - 1 && engine.priorities.contains(tmp + postfix_expr[i + 1])) {
                                 tmp += postfix_expr[i + 1];
                                 i++;
                             }
@@ -362,7 +360,7 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    result.emplace_back(tmp);
+                    result.emplace_back(tmp, ins::UPDATE);
                     break;
                 }
                 case ins::DELETE: {
@@ -374,7 +372,7 @@ namespace basic_parser {
                         }
                         ind++;
                     }
-                    result.emplace_back(tmp);
+                    result.emplace_back(tmp, ins::DELETE);
                     break;
                 }
                 case ins::SET: {
@@ -442,7 +440,7 @@ namespace basic_parser {
                 ops.pop();
             } else if (op_chars.contains(expr[i])) {
                 tmp_op = expr[i];
-                if (i < expr.size() - 1 && expr[i] == expr[i + 1]) {
+                if (i < expr.size() - 1 && priorities.contains(tmp_op + expr[i + 1])) {
                     tmp_op += expr[i + 1];
                     i++;
                 } else if (is_last_ch_op && expr[i] == '-') {

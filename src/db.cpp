@@ -17,7 +17,7 @@ namespace memdb {
             columns_names[i].second.end() &&
             columns_type[i].second.get_cell_type() == cell::EMPTY) {
             throw std::runtime_error(
-                "Can't insert empty value to a column with no default value or autoincrement attribute\n");
+                    "Can't insert empty value to a column with no default value or autoincrement attribute\n");
         }
         if (v.get_cell_type() != cell::EMPTY && v.get_cell_type() != columns_type[i].first) {
             throw std::runtime_error("The types of value and column are mismatched\n");
@@ -68,13 +68,14 @@ namespace memdb {
                 switch (i.get_type()) {
                     case ins::CREATE: {
                         header h(i.get_columns_names(), i.get_columns_types());
-                        if (i.get_table_name() == ""){
+                        if (i.get_table_name() == "") {
                             throw std::runtime_error("Table name can't be empty\n");
                         }
                         tables[i.get_table_name()] = std::make_shared<table>(table(h));
                         ret_val = result(i.get_type());
                         break;
                     }
+
                     case ins::INSERT: {
                         std::vector<cell::Cell> ordered_values;
                         std::unordered_map<std::string, cell::Cell> values_by_name;
@@ -109,12 +110,18 @@ namespace memdb {
                         ret_val = result(i.get_type());
                         break;
                     }
+
                     case ins::TO: {
+                        if (!tables.contains(i.get_table_name())) {
+                            std::string error_msg = "There is no such table name " + i.get_table_name();
+                            throw std::runtime_error(error_msg);
+                        }
                         cur_table = this->tables[i.get_table_name()];
                         break;
                     }
+
                     case ins::SELECT: {
-                        // TODO: Debug the whole thing.
+                        // TODO: Debug the whole thing. (Partly done)
                         std::unordered_map<std::string, std::vector<std::string> > col_to_table_name = i.col_to_tables;
                         std::vector<std::string> cols_to_select = {};
                         std::vector<int> rows_to_select = {};
@@ -143,10 +150,10 @@ namespace memdb {
                         int streak = 0;
                         int prev = -1;
                         std::vector<std::vector<int> > rows_from_tables = std::vector<std::vector<int> >(
-                            tables_to_operate_with.size());
+                                tables_to_operate_with.size());
                         std::vector<std::vector<int> > cols_from_tables = std::vector<std::vector<
-                            int> >(tables_to_operate_with.size());
-                        for (auto &[k,v]: col_to_table_name) {
+                                int> >(tables_to_operate_with.size());
+                        for (auto &[k, v]: col_to_table_name) {
                             for (auto &str: v) {
                                 int ind = std::ranges::find(tables_to_operate_with.begin(),
                                                             tables_to_operate_with.end(),
@@ -171,19 +178,53 @@ namespace memdb {
                         }
                         ret_val = result(resulting_vector);
                     }
+
                     case ins::FROM: {
                         for (auto &name: i.table_names) {
                             tables_to_operate_with.emplace_back(tables[name]);
                         }
                         break;
                     }
+
                     case ins::WHERE: {
                         instruction_root = i.operators;
                         break;
                     }
+
+                    case ins::DELETE: {
+                        if (!tables.contains(i.table_name)) {
+                            throw std::runtime_error(
+                                    "Can't find such table to delete from: " + i.get_table_name() + "\n");
+                        }
+                        auto table_to_delete_from = tables[i.table_name];
+                        int ind = 0;
+                        size_t size = table_to_delete_from->row_size;
+                        while (ind < size) {
+                            std::unordered_map<std::string, cell::Cell> check_row;
+
+                            for (int j = 0; j < table_to_delete_from->rows[ind].size(); j++) {
+                                check_row[table_to_delete_from->cols.col_names[j].first] = table_to_delete_from->rows[ind][j];
+                            }
+                            if (instruction_root.exec_operator(check_row).get_bool()) {
+                                table_to_delete_from->delete_row(ind);
+                                ind--;
+                                size--;
+                            }
+                            ind++;
+                        }
+                        ret_val = result(ins::DELETE);
+                        return ret_val;
+                    }
+
                     default: {
                         throw std::runtime_error("Unsupported");
                     }
+                    case ins::UPDATE:
+                        break;
+                    case ins::SET:
+                        break;
+                    case ins::ERROR:
+                        throw std::runtime_error("An exception occured while parsing the query\n");
                 }
             }
         } catch (std::runtime_error &e) {
@@ -280,7 +321,19 @@ namespace memdb {
         this->col_types = types;
     }
 
-    void table::insert_row(std::vector<cell::Cell> &row) { rows.emplace_back(row); }
+    void table::insert_row(std::vector<cell::Cell> &row) {
+        rows.emplace_back(row);
+        row_size++;
+    }
+
+    void table::delete_row(size_t n) {
+        if (n > row_size) {
+            throw std::runtime_error("There is no such row to delete!\n");
+        }
+        auto pos = rows.begin();
+        std::advance(pos, n);
+        rows.erase(pos);
+    }
 
 
     table::table(header &h) { this->cols = h; }
@@ -312,7 +365,12 @@ namespace memdb {
 
     std::string cell_to_output(cell::Cell &x) {
         std::unordered_map<int, std::string> hex_to_string = {
-            {10, "A"}, {11, "B"}, {12, "C"}, {13, "D"}, {14, "E"}, {15, "F"}
+                {10, "A"},
+                {11, "B"},
+                {12, "C"},
+                {13, "D"},
+                {14, "E"},
+                {15, "F"}
         };
         switch (x.get_cell_type()) {
             case cell::BOOL: {
@@ -351,7 +409,7 @@ namespace memdb {
             }
             default: {
                 throw std::runtime_error(
-                    "Cannot convert empty cell to string. Error is bogus as there shouldn't be any empty cells in table");
+                        "Cannot convert empty cell to string. Error is bogus as there shouldn't be any empty cells in table");
                 break;
             }
         }

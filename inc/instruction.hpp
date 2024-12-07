@@ -54,7 +54,7 @@ namespace ins {
 
         instruction(const std::vector<cell::Cell> &v);
 
-        instruction(const std::string &table_to);
+        instruction(const std::string &table_to, instruction_type type);
 
         instruction(const std::unordered_map<std::string, cell::Cell> &v);
 

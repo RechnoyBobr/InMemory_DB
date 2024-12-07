@@ -50,6 +50,8 @@ namespace memdb {
         friend db;
         friend table_view;
         friend result;
+
+        void delete_row(size_t n);
     };
 
     class table_view {

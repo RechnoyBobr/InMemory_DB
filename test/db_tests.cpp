@@ -23,8 +23,25 @@ TEST(db_tests, insert_select_tables_test) {
     Database.execute("insert (,\"oleg\",) to users");
     result = Database.execute("select name, id from users where |name| % 2 = 0");
     if (result.is_ok()) {
+        int cnt = 0;
         for (auto &row: result) {
             std::cout << row[0].get<int>() << " " << row[1].get<std::string>() << "\n";
+            cnt++;
+        }
+        EXPECT_EQ(cnt, 2);
+        result = Database.execute("delete users where |name| % 2 = 0");
+        if (result.is_ok()) {
+            result = Database.execute("select name, id from users where |name| >= 4");
+            if (result.is_ok()) {
+                cnt = 0;
+                for (auto &row: result) {
+                    std::cout << row[0].get<int>() << " " << row[1].get<std::string>() << "\n";
+                    cnt++;
+                }
+                EXPECT_EQ(cnt, 1);
+            } else {
+                std::cout << result.get_error() << "\n";
+            }
         }
     }
 }

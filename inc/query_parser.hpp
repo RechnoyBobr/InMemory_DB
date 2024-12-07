@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string_view>
 #include <unordered_map>
 #include "cell.hpp"
@@ -22,8 +23,23 @@ namespace basic_parser {
     public:
         class math_engine {
             std::unordered_map<std::string, int> priorities = {
-                {"(", 0}, {"||", 1}, {"&&", 2}, {"^^", 3}, {"=", 4}, {"!=", 4}, {"<", 5}, {"<=", 5}, {">", 5},
-                {">=", 5}, {"-", 6}, {"+", 6}, {"*", 7}, {"/", 7}, {"%", 7}, /*if number is negative*/{"~", 8}, {"|", 8}
+                    {"(",  0},
+                    {"||", 1},
+                    {"&&", 2},
+                    {"^^", 3},
+                    {"=",  4},
+                    {"!=", 4},
+                    {"<",  5},
+                    {"<=", 5},
+                    {">",  5},
+                    {">=", 5},
+                    {"-",  6},
+                    {"+",  6},
+                    {"*",  7},
+                    {"/",  7},
+                    {"%",  7}, /*if number is negative*/
+                    {"~",  8},
+                    {"|",  8}
 
             };
 
@@ -37,10 +53,14 @@ namespace basic_parser {
 
             // Returns the result of calculated expression
             std::string to_postfix(std::string &expr);
+
+            friend query_parser;
         };
 
         static cell::Cell get_cell(std::string &str, cell::col_type cur_type);
+
         static cell::Cell get_cell(std::string &str);
+
         static cell::col_type get_cell_type_by_value(std::string tmp);
 
         static std::vector<ins::instruction> parse(std::string_view query);

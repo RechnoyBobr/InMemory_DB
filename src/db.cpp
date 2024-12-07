@@ -43,7 +43,7 @@ namespace memdb {
                    columns_names[i].second.end()) {
             for (int j = 0; j < rows.size(); j++) {
                 if (rows[j][i] == v) {
-                    throw std::runtime_error("Column have attributes key/unique");
+                    throw std::runtime_error("Column have attributes key/unique\n");
                 }
             }
             row_to_insert[i] = v;
@@ -68,6 +68,9 @@ namespace memdb {
                 switch (i.get_type()) {
                     case ins::CREATE: {
                         header h(i.get_columns_names(), i.get_columns_types());
+                        if (i.get_table_name() == ""){
+                            throw std::runtime_error("Table name can't be empty\n");
+                        }
                         tables[i.get_table_name()] = std::make_shared<table>(table(h));
                         ret_val = result(i.get_type());
                         break;

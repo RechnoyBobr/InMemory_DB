@@ -17,7 +17,8 @@ fetchcontent_declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(lexer_tests test/lexer_test.cpp)
+add_executable(lexer_tests test/lexer_test.cpp
+        test/db_tests.cpp)
 add_executable(parser_tests test/parser_test.cpp)
 add_executable(math_engine_tests test/math_engine_test.cpp)
 add_executable(db_tests test/db_tests.cpp)

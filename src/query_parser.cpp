@@ -208,6 +208,7 @@ namespace basic_parser {
                                 insert_type = 2;
                                 values_by_name[column_name] = c;
                             }
+                            tmp = "";
                         } else if (params[ind] != ' ' && params[ind] != '(') {
                             tmp += params[ind];
                         }
@@ -377,7 +378,7 @@ namespace basic_parser {
                     break;
                 }
                 case ins::SET: {
-                    
+
                     break;
                 }
 

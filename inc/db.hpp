@@ -136,9 +136,9 @@ namespace memdb {
 
         result execute(std::string_view query);
 
-        void load_from_file(std::istream);
+        void load_from_file(std::istream &stream);
 
-        void save_to_file(std::ostream);
+        void save_to_file(std::ostream &stream);
 
         std::string &debug_get_table_ith_col_name(const std::string &name, int i);
     };

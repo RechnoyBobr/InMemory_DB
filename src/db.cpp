@@ -189,6 +189,9 @@ namespace memdb {
         return ret_val;
     }
 
+    void db::load_from_file(std::istream &stream) {
+    }
+
 
     result::iterator::iterator(std::vector<table_view> &views, size_t current_col) {
         sources = views;
@@ -303,6 +306,57 @@ namespace memdb {
     std::vector<std::pair<cell::col_type, cell::Cell> > &header::get_columns_types() { return col_types; }
 
     auto &table::get_ith_col_name(int i) { return cols.get_columns_names()[i].first; }
+
+    std::string cell_to_output(cell::Cell &x) {
+        std::unordered_map<int, std::string> hex_to_string = {
+            {10, "A"}, {11, "B"}, {12, "C"}, {13, "D"}, {14, "E"}, {15, "F"}
+        };
+        switch (x.get_cell_type()) {
+            case cell::BOOL: {
+                if (x.get<bool>()) {
+                    return "true";
+                }
+                return "false";
+                break;
+            }
+            case cell::INT32: {
+                return std::to_string(x.get<int>());
+                break;
+            }
+            case cell::BYTES: {
+                std::string ret_val = "0x";
+                for (std::byte b: x.get<std::vector<std::byte> >()) {
+                    int first_byte = static_cast<int>(b) / 16;
+                    int second_byte = static_cast<int>(b) % 16;
+                    if (first_byte >= 10) {
+                        ret_val += hex_to_string[first_byte];
+                    } else {
+                        ret_val += std::to_string(first_byte);
+                    }
+                    if (second_byte >= 10) {
+                        ret_val += hex_to_string[second_byte];
+                    } else {
+                        ret_val += std::to_string(second_byte);
+                    }
+                }
+                return ret_val;
+                break;
+            }
+            case cell::STRING: {
+                return x.get<std::string>();
+                break;
+            }
+            default: {
+                throw std::runtime_error(
+                    "Cannot convert empty cell to string. Error is bogus as there shouldn't be any empty cells in table");
+                break;
+            }
+        }
+    }
+
+    void db::save_to_file(std::ostream &stream) {
+
+    }
 
     std::string &db::debug_get_table_ith_col_name(const std::string &name, int i) {
         return tables[name]->get_ith_col_name(i);

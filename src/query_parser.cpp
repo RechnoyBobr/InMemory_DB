@@ -195,8 +195,7 @@ namespace basic_parser {
                             // Then we should save column name
                             column_name = tmp;
                             tmp = "";
-                        }
-                        else if (params[ind] == ')' || params[ind] == ',') {
+                        } else if (params[ind] == ')' || params[ind] == ',') {
                             cell::col_type cur_type = get_cell_type_by_value(tmp);
                             cell::Cell c;
                             if (!tmp.empty()) {
@@ -353,6 +352,35 @@ namespace basic_parser {
                     result.emplace_back(res, type);
                     break;
                 }
+                case ins::UPDATE: {
+                    int ind = 0;
+                    std::string tmp;
+                    while (ind < params.size()) {
+                        if (params[ind] != ' ') {
+                            tmp += params[ind];
+                        }
+                        ind++;
+                    }
+                    result.emplace_back(tmp);
+                    break;
+                }
+                case ins::DELETE: {
+                    int ind = 0;
+                    std::string tmp;
+                    while (ind < params.size()) {
+                        if (params[ind] != ' ') {
+                            tmp += params[ind];
+                        }
+                        ind++;
+                    }
+                    result.emplace_back(tmp);
+                    break;
+                }
+                case ins::SET: {
+                    
+                    break;
+                }
+
 
                 default:
                     throw std::runtime_error("There was an error during the lexing process");

@@ -205,18 +205,21 @@ namespace op {
         } else {
             is_single_op = true;
         }
+        cell::Cell ret_val;
         switch (first_val.get_cell_type()) {
             case cell::INT32: {
                 if (is_single_op) {
                     second_val = cell::Cell(0);
                 }
-                return exec_op(first_val.get<int>(), second_val.get<int>());
+                ret_val = exec_op(first_val.get<int>(), second_val.get<int>());
+                break;
             }
             case cell::BOOL: {
                 if (is_single_op) {
                     second_val = cell::Cell(false);
                 }
-                return exec_op(first_val.get<bool>(), second_val.get<bool>());
+                ret_val = exec_op(first_val.get<bool>(), second_val.get<bool>());
+                break;
             }
             case cell::BYTES: {
                 if (is_single_op) {
@@ -226,7 +229,8 @@ namespace op {
                 std::vector<std::byte> first = first_val.get<std::vector<std::byte> >();
                 std::vector<std::byte> second = second_val.get<std::vector<std::byte> >();
 
-                return exec_op(first, second);
+                ret_val = exec_op(first, second);
+                break;
             }
             case cell::STRING: {
                 std::string s1 = first_val.get<std::string>();
@@ -234,12 +238,32 @@ namespace op {
                 if (!is_single_op) {
                     s2 = second_val.get<std::string>();
                 }
-                return exec_op(s1, s2);
+                ret_val = exec_op(s1, s2);
+                break;
             }
             default: {
                 throw std::runtime_error("Can't execute operation on empty value or column name\n");
             }
         }
+        // Some type of optimization
+        // if (v1->check_for_substitution() && v2->check_for_substitution()) {
+        //     this->type = VALUE;
+        //     this->v = ret_val;
+        // }
+        return ret_val;
+    }
+
+    bool instruction_operator::check_for_substitution() const {
+        if (v.get_cell_type() == cell::COL_NAME) {
+            return false;
+        }
+        if (v1 == nullptr && v2 == nullptr) {
+            return true;
+        }
+        if (v.get_cell_type() != cell::EMPTY) {
+            return v1->check_for_substitution() && v2->check_for_substitution();
+        }
+        return true;
     }
 
     bool instruction_operator::is_single() const {

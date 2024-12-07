@@ -45,6 +45,8 @@ namespace op {
 
         cell::Cell exec_operator(std::unordered_map<std::string, cell::Cell> &line);
 
+        bool check_for_substitution() const;
+
         cell::Cell exec_op(std::string &s1, std::string &s2) const;
 
         cell::Cell exec_op(int i1, int i2);
